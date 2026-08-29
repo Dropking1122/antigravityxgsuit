@@ -153,6 +153,26 @@ def move_account(email: str, gpw: str, status: str, error_msg: str = ""):
             print(f"[!] Gagal memperbarui {ACCOUNTS_FILE}: {e}")
 
 
+def is_email_already_imported(page, email: str) -> bool:
+    """Cek apakah email sudah ada di daftar provider dashboard sebelum mulai proses impor."""
+    try:
+        page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=15000)
+        time.sleep(2)
+        content = page.content()
+        if email.lower() in content.lower():
+            return True
+        try:
+            elem = page.locator(f"text={email}").first
+            if elem.is_visible(timeout=2000):
+                return True
+        except Exception:
+            pass
+        return False
+    except Exception as e:
+        print(f"[*] Cek email terimpor awal error: {e}")
+        return False
+
+
 def verify_account_imported(page, email: str) -> bool:
     """Validasi apakah email yang diimpor muncul di halaman dashboard provider."""
     print(f"[*] Memvalidasi apakah email {email} sudah terimpor di halaman provider...")
@@ -333,10 +353,12 @@ def run():
                     print(f"[*] (sudah {idx} akun) session Google di-reset.\n")
             print(f"\n=== Akun {idx}/{len(accounts)}: {email} ===")
 
-            # 2a. Ke halaman provider
-            print("[*] Buka halaman provider...")
-            page.goto(TARGET_URL, wait_until="domcontentloaded")
-            time.sleep(2)
+            # 2a. Ke halaman provider & Cek apakah email sudah terimpor
+            print("[*] Buka halaman provider & cek status email awal...")
+            if is_email_already_imported(page, email):
+                print(f"[✓] Email {email} SUDAH TERIMPOR sebelumnya di dashboard server! Langsung pindah ke {PROCESSED_ACCOUNTS_FILE}.")
+                move_account(email, gpw, "SUCCESS", "Sudah terimpor sebelumnya")
+                continue
 
             # 2b. Klik Add
             print("[*] Klik Add...")
