@@ -519,11 +519,55 @@
     .badge-success { background: var(--success-glow); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
     .badge-failed { background: var(--danger-glow); color: var(--danger); border: 1px solid rgba(244,63,94,0.3); }
 
-    /* LOG DISPLAY */
-    .log-viewer {
-      background: #050811;
-      border: 1px solid var(--surface-border);
+    /* LOG DISPLAY TERMINAL HACKER THEME */
+    .terminal-window {
+      background: #04080e;
+      border: 1px solid #1a2a3a;
       border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 15px rgba(0,255,136,0.05);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .terminal-header {
+      background: #08101a;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #162434;
+    }
+    
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+    
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+    
+    .terminal-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #00ff88;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .log-viewer {
+      background: #04080e;
+      border: none;
+      border-radius: 0;
       padding: 14px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
@@ -532,9 +576,16 @@
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;
-      color: #38bdf8;
-      box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+      color: #00ff88;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
     }
+    
+    .log-line { margin-bottom: 2px; }
+    .log-line.success { color: #00ff88; font-weight: 600; }
+    .log-line.error { color: #ff4a5a; font-weight: 600; }
+    .log-line.warn { color: #ffb86c; }
+    .log-line.info { color: #8be9fd; }
+    .log-line.dim { color: #44475a; }
 
     .log-controls {
       display: flex;
@@ -755,11 +806,11 @@
     </div>
 
     <!-- PROCESS LOGS -->
-    <div class="card">
-      <div class="card-header">
+    <div class="card" style="padding: 14px;">
+      <div class="card-header" style="margin-bottom: 10px;">
         <div class="card-title">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          Console Activity Log
+          Terminal Console Output
         </div>
         <div class="log-controls">
           <label class="checkbox-tile" style="padding: 4px 8px; border: none; background: transparent;">
@@ -770,7 +821,22 @@
         </div>
       </div>
 
-      <div id="log" class="log-viewer">Menunggu proses dijalankan...</div>
+      <!-- Hacker Terminal Window -->
+      <div class="terminal-window">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+          </div>
+          <div class="terminal-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            root@antigravity:~ automation.sh
+          </div>
+          <div style="font-family: monospace; font-size: 10px; color: #44475a;">UTF-8</div>
+        </div>
+        <div id="log" class="log-viewer"><span class="log-line dim">[$] System initialized. Ready to execute process...</span></div>
+      </div>
     </div>
   </div>
 
@@ -1245,12 +1311,34 @@ async function pollLogs() {
     
     setBadge(j.running, j.pid);
     
-    document.getElementById('log').textContent = (j.logs || []).join('\n');
+    const rawLogs = j.logs || [];
+    const logElem = document.getElementById('log');
+    
+    if (rawLogs.length === 0) {
+      logElem.innerHTML = '<span class="log-line dim">[$] System initialized. Waiting for task execution...</span>';
+    } else {
+      const formatted = rawLogs.map(line => {
+        const escaped = escapeHtml(line);
+        if (line.includes('[✓]') || line.includes('SUKSES') || line.includes('berhasil') || line.includes('SUCCESS')) {
+          return `<div class="log-line success">${escaped}</div>`;
+        } else if (line.includes('[!]') || line.includes('[✗]') || line.includes('GAGAL') || line.includes('Error') || line.includes('Timeout')) {
+          return `<div class="log-line error">${escaped}</div>`;
+        } else if (line.includes('[*]') || line.includes('START') || line.includes('Akun')) {
+          return `<div class="log-line info">${escaped}</div>`;
+        } else if (line.includes('===') || line.includes('---')) {
+          return `<div class="log-line warn">${escaped}</div>`;
+        } else {
+          return `<div class="log-line">${escaped}</div>`;
+        }
+      }).join('');
+      
+      logElem.innerHTML = formatted;
+    }
+    
     document.getElementById('urls').value = (j.urls_tail || []).join('\n');
     
     if (document.getElementById('autoScroll').checked) {
-      const el = document.getElementById('log');
-      el.scrollTop = el.scrollHeight;
+      logElem.scrollTop = logElem.scrollHeight;
     }
   } catch (err) {
     console.error('Error polling logs:', err);
