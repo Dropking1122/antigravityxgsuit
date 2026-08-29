@@ -14,21 +14,27 @@ Catatan: login Google via otomasi sering terblokir deteksi bot Google
 import os
 import time
 import shutil
-from datetime import datetime
+from pathlib import Path
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=True)
 except ImportError:
     pass
 from playwright.sync_api import sync_playwright
 
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+LOGS_DIR = BASE_DIR / "logs"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
 # ---- Konfigurasi ----
-LOGIN_URL = os.getenv("LOGIN_URL", "http://localhost:20128/login")
-TARGET_URL = os.getenv("TARGET_URL", "http://localhost:20128/dashboard/providers/antigravity")
-PASSWORD = os.getenv("DASH_PASSWORD", "")
+LOGIN_URL = os.getenv("LOGIN_URL", "http://38.47.85.35:20128/login")
+TARGET_URL = os.getenv("TARGET_URL", "http://38.47.85.35:20128/dashboard/providers/antigravity")
+PASSWORD = os.getenv("DASH_PASSWORD", "Masuk123321")
 PROFILE = os.getenv("USER_DATA_DIR", "./browser_profile")
-HEADLESS = os.getenv("HEADLESS", "false").lower() == "true"
-ACCOUNTS_FILE = os.getenv("ACCOUNTS_FILE", os.path.join("data", "accounts.txt"))
+HEADLESS = os.getenv("HEADLESS", "true").lower() == "true"
+ACCOUNTS_FILE = os.getenv("ACCOUNTS_FILE", "accounts.txt")
 # Kalau "true", hapus folder profil agar benar-benar fresh (akun Google lama hilang)
 RESET_PROFILE = os.getenv("RESET_PROFILE", "false").lower() == "true"
 # Jika true, tiap akun restart browser (fresh) agar account chooser tidak muncul - solusi VPS
@@ -40,10 +46,10 @@ CLEAR_EACH = os.getenv("CLEAR_EACH", "true").lower() == "true"
 REDIRECT_FROM = os.getenv("REDIRECT_FROM", "http://localhost:20128")
 REDIRECT_TO = os.getenv("REDIRECT_TO", "http://38.47.85.35:20128")
 
-# File log semua URL & Akun
-URL_LOG_FILE = os.getenv("URL_LOG_FILE", os.path.join("logs", "urls.txt"))
-PROCESSED_ACCOUNTS_FILE = os.getenv("PROCESSED_ACCOUNTS_FILE", os.path.join("data", "processed_accounts.txt"))
-FAILED_ACCOUNTS_FILE = os.getenv("FAILED_ACCOUNTS_FILE", os.path.join("data", "failed_accounts.txt"))
+# File log semua URL & file riwayat akun
+URL_LOG_FILE = os.getenv("URL_LOG_FILE", "urls.txt")
+PROCESSED_ACCOUNTS_FILE = DATA_DIR / "processed_accounts.txt"
+FAILED_ACCOUNTS_FILE = DATA_DIR / "failed_accounts.txt"
 
 # Menyimpan URL callback terakhir yang sudah di-rewrite ke IP
 # (dipakai untuk re-hit kalau tab keburu close)
@@ -96,8 +102,11 @@ def load_accounts(path: str):
     """Baca file teks baris: gmail|password"""
     accounts = []
     if not os.path.exists(path):
-        print(f"[!] File akun tidak ada: {path}")
-        return accounts
+        if os.path.exists(os.path.join("data", path)):
+            path = os.path.join("data", path)
+        else:
+            print(f"[!] File akun tidak ada: {path}")
+            return accounts
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -111,10 +120,8 @@ def load_accounts(path: str):
 
 
 def move_account(email: str, gpw: str, status: str, error_msg: str = ""):
-    """Pindahkan akun dari ACCOUNTS_FILE (accounts.txt) ke PROCESSED_ACCOUNTS_FILE
-    atau FAILED_ACCOUNTS_FILE."""
-    # 1. Catat ke file tujuan
     target_file = PROCESSED_ACCOUNTS_FILE if status == "SUCCESS" else FAILED_ACCOUNTS_FILE
+    from datetime import datetime
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"{email}|{gpw}|{status}|{timestamp}"
     if error_msg:
@@ -123,127 +130,76 @@ def move_account(email: str, gpw: str, status: str, error_msg: str = ""):
     try:
         with open(target_file, "a", encoding="utf-8") as f:
             f.write(log_entry + "\n")
-        print(f"[*] Catat status akun {email} -> {status} di {target_file}")
-    except Exception as e:
-        print(f"[!] Gagal menulis ke {target_file}: {e}")
+    except Exception:
+        pass
 
-    # 2. Hapus dari ACCOUNTS_FILE
-    if os.path.exists(ACCOUNTS_FILE):
-        try:
-            with open(ACCOUNTS_FILE, "r", encoding="utf-8") as f:
-                lines = f.read().splitlines()
-            new_lines = []
-            removed = False
-            for line in lines:
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#"):
-                    new_lines.append(line)
-                    continue
-                if "|" in stripped:
-                    em, _ = stripped.split("|", 1)
-                    if em.strip().lower() == email.strip().lower() and not removed:
-                        removed = True
-                        continue
-                new_lines.append(line)
-            
-            with open(ACCOUNTS_FILE, "w", encoding="utf-8") as f:
-                f.write("\n".join(new_lines) + ("\n" if new_lines else ""))
-            print(f"[*] Akun {email} dipindahkan dari {ACCOUNTS_FILE}")
-        except Exception as e:
-            print(f"[!] Gagal memperbarui {ACCOUNTS_FILE}: {e}")
-
-
-def is_email_already_imported(page, email: str) -> bool:
-    """Cek apakah email sudah ada di daftar provider dashboard sebelum mulai proses impor."""
-    try:
-        page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=15000)
-        time.sleep(2)
-        content = page.content()
-        if email.lower() in content.lower():
-            return True
-        try:
-            elem = page.locator(f"text={email}").first
-            if elem.is_visible(timeout=2000):
-                return True
-        except Exception:
-            pass
-        return False
-    except Exception as e:
-        print(f"[*] Cek email terimpor awal error: {e}")
-        return False
-
-
-def verify_account_imported(page, email: str) -> bool:
-    """Validasi apakah email yang diimpor muncul di halaman dashboard provider."""
-    print(f"[*] Memvalidasi apakah email {email} sudah terimpor di halaman provider...")
-    try:
-        page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=15000)
-        time.sleep(3)
-        # Cari text email di dalam DOM
-        content = page.content()
-        if email.lower() in content.lower():
-            print(f"[✓] VALIDASI SUKSES: Email {email} ditemukan pada halaman provider!")
-            return True
-        else:
-            # Coba selektor spesifik jika ada table/card
+    # Hapus akun dari file antrean accounts.txt
+    target_acc_files = [Path(ACCOUNTS_FILE), DATA_DIR / "accounts.txt", BASE_DIR / "accounts.txt"]
+    for acc_f in target_acc_files:
+        if acc_f.exists():
             try:
-                elem = page.locator(f"text={email}").first
-                if elem.is_visible(timeout=3000):
-                    print(f"[✓] VALIDASI SUKSES (via locator): Email {email} terlihat!")
-                    return True
+                lines = acc_f.read_text(encoding="utf-8").splitlines()
+                new_lines = []
+                removed = False
+                for line in lines:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        new_lines.append(line)
+                        continue
+                    if "|" in stripped:
+                        em, _ = stripped.split("|", 1)
+                        if em.strip().lower() == email.strip().lower() and not removed:
+                            removed = True
+                            continue
+                    new_lines.append(line)
+                acc_f.write_text("\n".join(new_lines) + ("\n" if new_lines else ""), encoding="utf-8")
             except Exception:
                 pass
-            print(f"[✗] VALIDASI GAGAL: Email {email} TIDAK ditemukan di halaman provider!")
-            return False
-    except Exception as e:
-        print(f"[!] Gagal saat melakukan validasi impor email: {e}")
-        return False
 
 
 def log_url(url: str):
-    """Simpan URL ke file log logs/urls.txt (1 baris per URL). Aman dari duplikat berurutan."""
+    """Simpan URL ke file log (1 baris per URL). Aman dari duplikat berurutan."""
     if not url:
         return
     try:
-        os.makedirs(os.path.dirname(URL_LOG_FILE), exist_ok=True)
-        if os.path.exists(URL_LOG_FILE):
-            with open(URL_LOG_FILE, "r", encoding="utf-8") as f:
+        url_file = LOGS_DIR / "urls.txt"
+        if url_file.exists():
+            with open(url_file, "r", encoding="utf-8") as f:
                 lines = f.read().splitlines()
             if lines and lines[-1] == url:
                 return
+        with open(url_file, "a", encoding="utf-8") as f:
+            f.write(url + "\n")
+        with open(BASE_DIR / "urls.txt", "a", encoding="utf-8") as f:
+            f.write(url + "\n")
     except Exception:
         pass
-    try:
-        with open(URL_LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(url + "\n")
-    except Exception as e:
-        print(f"[!] Gagal tulis log URL ke {URL_LOG_FILE}: {e}")
 
 
+# ==============================================================================
+# PENTING / JANGAN DIUBAH: Logika intercept redirect callback localhost ke IP server
+# ==============================================================================
 def _rewrite_redirect(route):
-    """Bila browser mencoba melakukan navigasi ke localhost, cegah koneksi langsung
-    dan alihkan (redirect) langsung ke IP host server."""
     url = route.request.url
-    from urllib.parse import urlparse, urlunparse
+    # Hanya tangani jika request benar-benar mengarah ke localhost/127.0.0.1 port 20128
+    # (PENTING: Jangan gunakan pengecekan substring 'localhost' karena URL internal Google
+    # membawa parameter 'redirect_uri=http://localhost:20128/callback' yang tidak boleh di-redirect).
+    from urllib.parse import urlparse
     parsed = urlparse(url)
-    if parsed.hostname == "localhost":
+    if parsed.hostname in ("localhost", "127.0.0.1") and (parsed.port == 20128 or ":20128" in url):
         ip_host = REDIRECT_TO.split("://", 1)[-1].split(":", 1)[0]
-        port = f":{parsed.port}" if parsed.port else ""
-        new_netloc = ip_host + port
-        new_url = urlunparse(parsed._replace(netloc=new_netloc))
-        is_real_callback = ("/callback?" in url and "code=" in url) or ("/callback" in url and "code=" in url and "state=" in url)
-        if is_real_callback:
+        new_url = url.replace("localhost:20128", f"{ip_host}:20128").replace("127.0.0.1:20128", f"{ip_host}:20128")
+        if "/callback" in url:
             LAST_REWRITE["url"] = new_url
             log_url(url)
             log_url(new_url)
-            print(f"[*] [Get URL] Callback OAuth Localhost terdeteksi")
-            print(f"[*] [Rewrite URL] Berhasil mengubah target dari Localhost -> Server IP: {new_netloc}")
-            print(f"[*] [Hit URL] Menghubungkan ke callback server IP...")
+            print(f"[*] Callback localhost terdeteksi ({url[:60]}...) -> redirect ke {new_url[:70]}...")
             route.fulfill(status=302, headers={"Location": new_url})
             return
         route.continue_(url=new_url)
-    else:
-        route.continue_()
+        return
+    route.continue_()
+# ==============================================================================
 
 
 # ---- Selector ----
@@ -320,403 +276,376 @@ def run():
 
         # 2. Loop tiap akun Google
         for idx, (email, gpw) in enumerate(accounts, 1):
-            # Reset session Google tiap akun (jika CLEAR_EACH=true) agar account chooser kosong
-            # atau restart browser per akun jika RESTART_BROWSER_PER_ACCOUNT=true
-            if idx > 1:
-                if RESTART_BROWSER_PER_ACCOUNT:
-                    print(f"[*] Membuat context/browser baru sebelum akun {idx}...")
-                    for sub in ("Cache", "Code Cache", "GPUCache"):
-                        cache_path = os.path.join(PROFILE, sub)
-                        if os.path.isdir(cache_path):
-                            shutil.rmtree(cache_path, ignore_errors=True)
-                    context = p.chromium.launch_persistent_context(
-                        PROFILE, headless=HEADLESS,
-                        args=["--disable-blink-features=AutomationControlled"])
-                    context.route("**/*", _rewrite_redirect)
-                    page = context.new_page()
-                    # login lagi setelah restart
-                    print("[*] Login ulang dashboard setelah restart...")
-                    page.goto(LOGIN_URL, wait_until="domcontentloaded")
-                    page.fill(SEL_PASSWORD_INPUT, PASSWORD)
-                    page.press(SEL_PASSWORD_INPUT, "Enter")
-                    page.wait_for_load_state("domcontentloaded")
-                    time.sleep(2)
-                elif CLEAR_EACH:
-                    clear_google_sessions(context)
-                    print(f"[*] (sudah {idx} akun) session Google di-reset (CLEAR_EACH).\n")
-                elif idx % 10 == 0:
-                    clear_google_sessions(context)
-                    print(f"[*] (sudah {idx} akun) session Google di-reset.\n")
-            print(f"\n=== Akun {idx}/{len(accounts)}: {email} ===")
-
-            # 2a. Ke halaman provider & Cek apakah email sudah terimpor
-            print("[*] Buka halaman provider & cek status email awal...")
-            if is_email_already_imported(page, email):
-                print(f"[✓] Email {email} SUDAH TERIMPOR sebelumnya di dashboard server! Langsung pindah ke {PROCESSED_ACCOUNTS_FILE}.")
-                move_account(email, gpw, "SUCCESS", "Sudah terimpor sebelumnya")
-                continue
-
-            # 2b. Klik Add
-            print("[*] Klik Add...")
-            page.click(SEL_ADD_BTN)
-            time.sleep(1)
-
-            # 2c. Modal -> I Understand, Continue (buka tab baru)
-            # Tunggu maks 5 dtk; kalau tidak muncul, halaman mungkin auto-redirect.
-            print("[*] Cari 'I Understand, Continue' (maks 5 dtk)...")
-            popup = None
             try:
-                page.wait_for_selector(SEL_CONTINUE_BTN, timeout=5000)
-                with page.expect_popup() as popup_info:
-                    page.click(SEL_CONTINUE_BTN)
-                popup = popup_info.value
-            except Exception:
-                print("[*] Tombol tidak muncul 5 dtk -> cek popup/redirect...")
-                # Coba ambil tab baru yang mungkin sudah terbuka
-                opened = [p for p in context.pages if p != page]
-                if opened:
-                    popup = opened[-1]
-                else:
-                    # Halaman mungkin reload/redirect -> ulangi alur Add
-                    page.goto(TARGET_URL, wait_until="domcontentloaded")
-                    time.sleep(2)
-                    page.click(SEL_ADD_BTN)
-                    time.sleep(1)
+                # Reset session Google tiap akun (jika CLEAR_EACH=true) agar account chooser kosong
+                # atau restart browser per akun jika RESTART_BROWSER_PER_ACCOUNT=true
+                if idx > 1:
+                    if RESTART_BROWSER_PER_ACCOUNT:
+                        print(f"[*] Menutup context lama dan membuat context/browser baru sebelum akun {idx}...")
+                        try:
+                            context.close()
+                        except Exception:
+                            pass
+                        # Hapus profil agar benar-benar fresh
+                        reset_profile()
+                        context = p.chromium.launch_persistent_context(
+                            PROFILE, headless=HEADLESS,
+                            args=args)
+                        context.route("**/*", _rewrite_redirect)
+                        page = context.new_page()
+                        # login lagi setelah restart
+                        print("[*] Login ulang dashboard setelah restart...")
+                        page.goto(LOGIN_URL, wait_until="domcontentloaded")
+                        page.fill(SEL_PASSWORD_INPUT, PASSWORD)
+                        page.press(SEL_PASSWORD_INPUT, "Enter")
+                        page.wait_for_load_state("domcontentloaded")
+                        time.sleep(2)
+                    elif CLEAR_EACH:
+                        clear_google_sessions(context)
+                        print(f"[*] (sudah {idx} akun) session Google di-reset (CLEAR_EACH).\n")
+                    elif idx % 10 == 0:
+                        clear_google_sessions(context)
+                        print(f"[*] (sudah {idx} akun) session Google di-reset.\n")
+                print(f"\n=== Akun {idx}/{len(accounts)}: {email} ===")
+
+                # 2a. Ke halaman provider
+                print("[*] Buka halaman provider...")
+                page.goto(TARGET_URL, wait_until="domcontentloaded")
+                time.sleep(2)
+
+                # 2b. Klik Add
+                print("[*] Klik Add...")
+                page.click(SEL_ADD_BTN)
+                time.sleep(1)
+
+                # 2c. Modal -> I Understand, Continue (buka tab baru)
+                # Tunggu maks 5 dtk; kalau tidak muncul, halaman mungkin auto-redirect.
+                print("[*] Cari 'I Understand, Continue' (maks 5 dtk)...")
+                popup = None
+                try:
                     page.wait_for_selector(SEL_CONTINUE_BTN, timeout=5000)
                     with page.expect_popup() as popup_info:
                         page.click(SEL_CONTINUE_BTN)
                     popup = popup_info.value
-
-            if popup is None:
-                print("[!] Gagal membuka tab Google, lewati akun ini.")
-                continue
-            popup.wait_for_load_state("domcontentloaded", timeout=15000)
-
-            # 2c2. Cek & klik "Use another account" jika ada akun sebelumnya (lebih robust untuk accountchooser v3)
-            try:
-                # tunggu popup benar2 load (accountchooser sering lambat)
-                try:
-                    popup.wait_for_load_state("domcontentloaded", timeout=5000)
                 except Exception:
-                    pass
-                time.sleep(1)
-                # cek URL apakah di accountchooser -> wajib klik Use another
+                    print("[*] Tombol tidak muncul 5 dtk -> cek popup/redirect...")
+                    # Coba ambil tab baru yang mungkin sudah terbuka
+                    opened = [p for p in context.pages if p != page]
+                    if opened:
+                        popup = opened[-1]
+                    else:
+                        # Halaman mungkin reload/redirect -> ulangi alur Add
+                        page.goto(TARGET_URL, wait_until="domcontentloaded")
+                        time.sleep(2)
+                        page.click(SEL_ADD_BTN)
+                        time.sleep(1)
+                        page.wait_for_selector(SEL_CONTINUE_BTN, timeout=5000)
+                        with page.expect_popup() as popup_info:
+                            page.click(SEL_CONTINUE_BTN)
+                        popup = popup_info.value
+
+                if popup is None:
+                    print("[!] Gagal membuka tab Google, lewati akun ini.")
+                    move_account(email, gpw, "FAILED", "Gagal membuka tab Google OAuth")
+                    continue
+                popup.wait_for_load_state("domcontentloaded", timeout=15000)
+
+                # 2c2. Cek & klik "Use another account" hanya jika BUKAN mode restart browser
+                if not RESTART_BROWSER_PER_ACCOUNT:
+                    try:
+                        # tunggu popup benar2 load (accountchooser sering lambat)
+                        try:
+                            popup.wait_for_load_state("domcontentloaded", timeout=5000)
+                        except Exception:
+                            pass
+                        time.sleep(1)
+                        # cek URL apakah di accountchooser -> wajib klik Use another
+                        try:
+                            cur = popup.url
+                            if "accountchooser" in cur:
+                                print(f"[*] Di halaman accountchooser: {cur[:100]}... -> cari 'Use another account'")
+                        except Exception:
+                            pass
+                        found_use_another = False
+                        # coba selector paling generic dulu: text=Use another account
+                        generic_selectors = [
+                            SEL_USE_ANOTHER,
+                            'text=Use another account',
+                            'div:has-text("Use another account")',
+                            'a:has-text("Use another account")',
+                            'span:has-text("Use another account")',
+                            'button:has-text("Use another account")',
+                            '*:has-text("Use another account")',
+                        ]
+                        for sel in generic_selectors:
+                            try:
+                                loc = popup.locator(sel)
+                                cnt = loc.count()
+                                if cnt > 0:
+                                    # tunggu visible 5 dtk
+                                    try:
+                                        # untuk text= selector, wait_for_selector butuh syntax berbeda
+                                        if sel.startswith("text="):
+                                            loc.first.wait_for(state="visible", timeout=5000)
+                                        else:
+                                            popup.wait_for_selector(sel, timeout=5000)
+                                        print(f"[*] Ada akun sebelumnya -> klik 'Use another account' ({sel} cnt={cnt})")
+                                        loc.first.click(timeout=5000)
+                                        found_use_another = True
+                                        time.sleep(3)
+                                        break
+                                    except Exception as e:
+                                        print(f"[*] Gagal klik {sel}: {e}")
+                                        pass
+                            except Exception:
+                                pass
+                        if not found_use_another:
+                            # fallback: coba get_by_text via evaluate
+                            try:
+                                # cek apakah ada elemen dengan text tersebut via JS
+                                has_text = popup.evaluate("() => document.body.innerText.includes('Use another account')")
+                                if has_text:
+                                    print("[*] Body mengandung 'Use another account' tapi selector tidak ketemu, coba click via JS")
+                                    popup.evaluate("() => { const els=[...document.querySelectorAll('*')]; const el=els.find(e=>e.innerText&&e.innerText.includes('Use another account')); if(el){el.click(); return true} return false }")
+                                    time.sleep(2)
+                                    found_use_another = True
+                            except Exception:
+                                pass
+                        if not found_use_another:
+                            print("[*] Tidak ada 'Use another account', lanjut isi email.")
+                        else:
+                            print("[*] Klik 'Use another account' berhasil")
+                    except Exception as e:
+                        print(f"[*] Error cek 'Use another account': {e}, lanjut isi email.")
+
+                # 2d. Isi email Google (robust: tunggu 15s, fill, klik Next dengan beberapa selector)
+                print("[*] Isi email Google...")
                 try:
-                    cur = popup.url
-                    if "accountchooser" in cur:
-                        print(f"[*] Di halaman accountchooser: {cur[:100]}... -> cari 'Use another account'")
+                    popup.wait_for_selector(SEL_GOOGLE_EMAIL, timeout=15000)
+                    print("[*] Input email ditemukan")
                 except Exception:
-                    pass
-                found_use_another = False
-                # coba selector paling generic dulu: text=Use another account
-                generic_selectors = [
-                    SEL_USE_ANOTHER,
-                    'text=Use another account',
-                    'div:has-text("Use another account")',
-                    'a:has-text("Use another account")',
-                    'span:has-text("Use another account")',
-                    'button:has-text("Use another account")',
-                    '*:has-text("Use another account")',
-                ]
-                for sel in generic_selectors:
+                    print("[!] Input email tidak ditemukan dalam 15s, coba cek URL popup:", popup.url if not popup.is_closed() else "closed")
+                try:
+                    popup.fill(SEL_GOOGLE_EMAIL, email, timeout=10000)
+                    print(f"[*] Email diisi: {email}")
+                except Exception as e:
+                    print(f"[!] Gagal isi email: {e}")
+                    # coba via locator
+                    try:
+                        popup.locator(SEL_GOOGLE_EMAIL).fill(email, timeout=5000)
+                        print("[*] Email diisi via locator")
+                    except Exception as e2:
+                        print(f"[!] Gagal isi email via locator: {e2}")
+                # klik Next dengan beberapa selector fallback
+                next_clicked = False
+                for sel in [SEL_GOOGLE_NEXT, '#identifierNext', 'button:has-text("Next")', 'div[role="button"]:has-text("Next")']:
                     try:
                         loc = popup.locator(sel)
-                        cnt = loc.count()
-                        if cnt > 0:
-                            # tunggu visible 5 dtk
-                            try:
-                                # untuk text= selector, wait_for_selector butuh syntax berbeda
-                                if sel.startswith("text="):
-                                    loc.first.wait_for(state="visible", timeout=5000)
-                                else:
-                                    popup.wait_for_selector(sel, timeout=5000)
-                                print(f"[*] Ada akun sebelumnya -> klik 'Use another account' ({sel} cnt={cnt})")
-                                loc.first.click(timeout=5000)
-                                found_use_another = True
-                                time.sleep(3)
-                                break
-                            except Exception as e:
-                                print(f"[*] Gagal klik {sel}: {e}")
-                                pass
-                    except Exception:
-                        pass
-                if not found_use_another:
-                    # fallback: coba get_by_text via evaluate
-                    try:
-                        # cek apakah ada elemen dengan text tersebut via JS
-                        has_text = popup.evaluate("() => document.body.innerText.includes('Use another account')")
-                        if has_text:
-                            print("[*] Body mengandung 'Use another account' tapi selector tidak ketemu, coba click via JS")
-                            popup.evaluate("() => { const els=[...document.querySelectorAll('*')]; const el=els.find(e=>e.innerText&&e.innerText.includes('Use another account')); if(el){el.click(); return true} return false }")
-                            time.sleep(2)
-                            found_use_another = True
-                    except Exception:
-                        pass
-                if not found_use_another:
-                    print("[*] Tidak ada 'Use another account', lanjut isi email.")
-                else:
-                    print("[*] Klik 'Use another account' berhasil")
-            except Exception as e:
-                print(f"[*] Error cek 'Use another account': {e}, lanjut isi email.")
-
-            # 2d. Isi email Google (robust: tunggu 15s, fill, klik Next dengan beberapa selector)
-            print("[*] Isi email Google...")
-            try:
-                popup.wait_for_selector(SEL_GOOGLE_EMAIL, timeout=15000)
-                print("[*] Input email ditemukan")
-            except Exception:
-                print("[!] Input email tidak ditemukan dalam 15s, coba cek URL popup:", popup.url if not popup.is_closed() else "closed")
-            try:
-                popup.fill(SEL_GOOGLE_EMAIL, email, timeout=10000)
-                print(f"[*] Email diisi: {email}")
-            except Exception as e:
-                print(f"[!] Gagal isi email: {e}")
-                # coba via locator
-                try:
-                    popup.locator(SEL_GOOGLE_EMAIL).fill(email, timeout=5000)
-                    print("[*] Email diisi via locator")
-                except Exception as e2:
-                    print(f"[!] Gagal isi email via locator: {e2}")
-            # klik Next dengan beberapa selector fallback
-            next_clicked = False
-            for sel in [SEL_GOOGLE_NEXT, '#identifierNext', 'button:has-text("Next")', 'div[role="button"]:has-text("Next")']:
-                try:
-                    loc = popup.locator(sel)
-                    if loc.count() > 0:
-                        try:
-                            # pastikan tombol enabled/visible
+                        if loc.count() > 0:
                             if loc.first.is_enabled(timeout=2000):
                                 print(f"[*] Klik Next via {sel}")
                                 loc.first.click(timeout=5000)
                                 next_clicked = True
                                 break
-                        except Exception:
-                            try:
-                                popup.click(sel, timeout=3000)
-                                next_clicked = True
-                                print(f"[*] Klik Next via click({sel})")
-                                break
-                            except Exception:
-                                pass
-                except Exception:
-                    pass
-            if not next_clicked:
-                print("[!] Next tidak terklik via selector, coba click generic")
-                try:
-                    popup.click(SEL_GOOGLE_NEXT, timeout=5000)
-                    next_clicked = True
-                except Exception as e:
-                    print(f"[!] Gagal klik Next: {e}")
-            time.sleep(3)
-
-            # 2e. Isi password (robust)
-            print("[*] Isi password Google...")
-            try:
-                # tunggu input password muncul (hingga 15s), jika tidak muncul mungkin sudah di halaman lain
-                try:
-                    popup.wait_for_selector(SEL_GOOGLE_PASS, timeout=15000)
-                    print("[*] Input password ditemukan")
-                    popup.fill(SEL_GOOGLE_PASS, gpw, timeout=10000)
-                    print("[*] Password diisi")
-                except Exception as e:
-                    print(f"[!] Input password tidak ditemukan / gagal isi: {e}, cek URL: {popup.url if not popup.is_closed() else 'closed'}")
-                    # coba pakai selector alternatif
-                    for alt in ['input[type="password"]', 'input[name="password"]', '#password']:
+                    except Exception:
                         try:
-                            if popup.locator(alt).count() > 0:
-                                popup.locator(alt).fill(gpw, timeout=3000)
-                                print(f"[*] Password diisi via {alt}")
-                                break
+                            popup.click(sel, timeout=3000)
+                            next_clicked = True
+                            print(f"[*] Klik Next via click({sel})")
+                            break
                         except Exception:
                             pass
-                # klik Next setelah password
-                pw_next_clicked = False
-                for sel in [SEL_GOOGLE_NEXT, '#passwordNext', 'button:has-text("Next")']:
-                    try:
-                        loc = popup.locator(sel)
-                        if loc.count() > 0 and loc.first.is_enabled(timeout=2000):
-                            print(f"[*] Klik Next password via {sel}")
-                            loc.first.click(timeout=5000)
-                            pw_next_clicked = True
-                            break
-                    except Exception:
-                        pass
-                if not pw_next_clicked:
+                if not next_clicked:
+                    print("[!] Next tidak terklik via selector, coba click generic")
                     try:
                         popup.click(SEL_GOOGLE_NEXT, timeout=5000)
-                        pw_next_clicked = True
+                        next_clicked = True
                     except Exception as e:
-                        print(f"[!] Gagal klik Next password: {e}")
-            except Exception as e:
-                print(f"[*] Gagal isi password (mungkin navigasi terjadi): {e}")
-            time.sleep(5)
-
-            # 2f. Opsional: "Don't get locked out" -> Do this later (aman dari error)
-            try:
-                if popup.locator(SEL_LOCKED_OUT).count() > 0:
-                    print("[*] Terdeteksi 'Don't get locked out' -> klik Do this later")
-                    popup.click(SEL_DO_LATER)
-                    time.sleep(3)
-            except Exception:
-                pass
-
-            # 2f2. Opsional: "Welcome to your new account" -> I understand
-            try:
-                popup.wait_for_selector(SEL_I_UNDERSTAND, timeout=8000)
-                print("[*] 'Welcome to your new account' -> klik 'I understand'")
-                popup.click(SEL_I_UNDERSTAND)
+                        print(f"[!] Gagal klik Next: {e}")
                 time.sleep(3)
-            except Exception:
-                pass
 
-            # 2g. Auto-klik "Sign in" / "Login" / "Continue" / "Allow" - loop hingga callback atau timeout
-            # reset rewrite untuk akun ini agar tidak pakai sisa akun sebelumnya
-            LAST_REWRITE["url"] = None
-            print("[*] Menunggu & auto-klik tombol konfirmasi (Sign in/Login/Continue/Allow) hingga callback...")
-            start_wait = time.time()
-            clicked_any = False
-            while time.time() - start_wait < 40:
-                # jika callback sudah ter-detect, break langsung ke handling callback
-                if LAST_REWRITE["url"]:
-                    print(f"[*] Callback terdeteksi via rewrite: {LAST_REWRITE['url']}")
-                    break
+                # 2e. Isi password (robust)
+                print("[*] Isi password Google...")
                 try:
-                    cur_url = popup.url if not popup.is_closed() else ""
-                    if "callback" in cur_url or "localhost:20128" in cur_url or "38.47.85.35:20128/callback" in cur_url:
-                        print(f"[*] URL popup sudah callback: {cur_url}")
-                        break
-                except Exception:
-                    pass
-                # daftar selector yang mungkin muncul - klik jika ada
-                handled = False
-                for sel, name in [
-                    (SEL_GOOGLE_SIGNIN, "Sign in"),
-                    (SEL_GOOGLE_SIGNIN_VARIANTS, "Login/Sign in variant"),
-                    ('button:has-text("Continue")', "Continue"),
-                    ('button:has-text("Allow")', "Allow"),
-                    ('button:has-text("Confirm")', "Confirm"),
-                    ('button:has-text("I understand")', "I understand"),
-                    (SEL_LOGIN_BTN, "Login"),
-                ]:
+                    # tunggu input password muncul (hingga 15s), jika tidak muncul mungkin sudah di halaman lain
                     try:
-                        loc = popup.locator(sel)
-                        if loc.count() > 0:
-                            # cek visible pertama
+                        popup.wait_for_selector(SEL_GOOGLE_PASS, timeout=15000)
+                        print("[*] Input password ditemukan")
+                        popup.fill(SEL_GOOGLE_PASS, gpw, timeout=10000)
+                        print("[*] Password diisi")
+                    except Exception as e:
+                        print(f"[!] Input password tidak ditemukan / gagal isi: {e}, cek URL: {popup.url if not popup.is_closed() else 'closed'}")
+                        # coba pakai selector alternatif
+                        for alt in ['input[type="password"]', 'input[name="password"]', '#password']:
                             try:
-                                first = loc.first
-                                if first.is_visible(timeout=1000):
-                                    print(f"[*] Tombol '{name}' ({sel}) terdeteksi -> klik otomatis")
-                                    try:
-                                        first.click(timeout=3000)
-                                    except Exception:
-                                        try:
-                                            popup.click(sel, timeout=3000)
-                                        except Exception:
-                                            pass
-                                    clicked_any = True
-                                    handled = True
-                                    time.sleep(2)
+                                if popup.locator(alt).count() > 0:
+                                    popup.locator(alt).fill(gpw, timeout=3000)
+                                    print(f"[*] Password diisi via {alt}")
                                     break
                             except Exception:
                                 pass
-                    except Exception:
-                        pass
-                if handled:
-                    continue
-                # jika tidak ada tombol, tunggu sebentar lalu cek lagi
-                time.sleep(1)
-                # juga cek jika popup sudah tertutup sendiri
+                    # klik Next setelah password
+                    pw_next_clicked = False
+                    for sel in [SEL_GOOGLE_NEXT, '#passwordNext', 'button:has-text("Next")']:
+                        try:
+                            loc = popup.locator(sel)
+                            if loc.count() > 0 and loc.first.is_enabled(timeout=2000):
+                                print(f"[*] Klik Next password via {sel}")
+                                loc.first.click(timeout=5000)
+                                pw_next_clicked = True
+                                break
+                        except Exception:
+                            pass
+                    if not pw_next_clicked:
+                        try:
+                            popup.click(SEL_GOOGLE_NEXT, timeout=5000)
+                            pw_next_clicked = True
+                        except Exception as e:
+                            print(f"[!] Gagal klik Next password: {e}")
+                except Exception as e:
+                    print(f"[*] Gagal isi password (mungkin navigasi terjadi): {e}")
+                time.sleep(5)
+
+                # 2f. Opsional: "Don't get locked out" -> Do this later (aman dari error)
                 try:
-                    if popup.is_closed():
-                        print("[*] Popup sudah tertutup")
-                        break
+                    if popup.locator(SEL_LOCKED_OUT).count() > 0:
+                        print("[*] Terdeteksi 'Don't get locked out' -> klik Do this later")
+                        popup.click(SEL_DO_LATER)
+                        time.sleep(3)
                 except Exception:
                     pass
-            if not LAST_REWRITE["url"]:
-                # coba sekali lagi deteksi Sign in secara eksplisit (fallback lama)
+
+                # 2f2. Opsional: "Welcome to your new account" -> I understand
                 try:
-                    popup.wait_for_selector(SEL_GOOGLE_SIGNIN, timeout=3000)
-                    print("[*] 'Sign in' muncul (fallback) -> klik otomatis")
-                    try:
-                        popup.click(SEL_GOOGLE_SIGNIN, timeout=3000)
-                    except Exception:
-                        popup.locator(SEL_GOOGLE_SIGNIN).first.click(timeout=3000)
+                    popup.wait_for_selector(SEL_I_UNDERSTAND, timeout=8000)
+                    print("[*] 'Welcome to your new account' -> klik 'I understand'")
+                    popup.click(SEL_I_UNDERSTAND)
                     time.sleep(3)
                 except Exception:
-                    if not clicked_any:
-                        print("[*] Tidak ada tombol konfirmasi terdeteksi dalam 40 dtk, lanjut cek callback")
-
-            # 2h. Tunggu callback OAuth selesai - JANGAN langsung close, beri waktu load IP
-            # Tunggu hingga LAST_REWRITE terisi atau timeout 60 dtk
-            print("[*] Menunggu callback localhost -> IP selesai...")
-            cb_start = time.time()
-            while time.time() - cb_start < 60:
-                if LAST_REWRITE["url"]:
-                    break
-                try:
-                    if popup.is_closed():
-                        break
-                    cur = popup.url
-                    if "callback" in cur:
-                        print(f"[*] Popup URL callback: {cur}")
-                        break
-                except Exception:
                     pass
-                time.sleep(1)
 
-            account_success = False
-            error_reason = ""
+                # 2g. Auto-klik tombol konfirmasi
+                LAST_REWRITE["url"] = None
+                print("[*] Menunggu & auto-klik tombol konfirmasi (Login/Sign in/Continue/Allow) hingga callback...")
+                start_wait = time.time()
+                while time.time() - start_wait < 40:
+                    if LAST_REWRITE["url"]:
+                        print(f"[*] Callback terdeteksi via rewrite")
+                        break
+                    try:
+                        cur_url = popup.url if not popup.is_closed() else ""
+                        if "callback" in cur_url:
+                            break
+                    except Exception:
+                        pass
 
-            if LAST_REWRITE["url"]:
-                print(f"[*] [Hit URL] Callback OAuth berhasil diterima oleh server 9Router!")
-                print("[*] Menunggu 5 detik agar server 9Router menyelesaikan impor token akun...")
-                time.sleep(5)
-                
-                # Validasi apakah akun berhasil terimpor di halaman provider
-                if verify_account_imported(page, email):
-                    account_success = True
+                    # ==============================================================================
+                    # PENTING / JANGAN DIUBAH: Penanganan konfirmasi layar persetujuan & speedbump Google
+                    # ==============================================================================
+                    try:
+                        login_candidates = [
+                            'button:has-text("Login")',
+                            'span.VfPpkd-vQzf8d:has-text("Login")',
+                            'button:has-text("Sign in")',
+                            'button:has-text("Lanjutkan")',
+                            'button:has-text("Izinkan")',
+                            'button:has-text("Allow")',
+                            'button:has-text("Continue")',
+                        ]
+                        for b_sel in login_candidates:
+                            loc = popup.locator(b_sel)
+                            if loc.count() > 0 and loc.first.is_visible(timeout=800):
+                                print(f"[*] Tombol persetujuan ('{b_sel}') terdeteksi -> klik otomatis")
+                                loc.first.click(timeout=3000)
+                                time.sleep(2)
+                                break
+                    except Exception:
+                        pass
+                    # ==============================================================================
+
+                    time.sleep(1)
+                    try:
+                        if popup.is_closed():
+                            break
+                    except Exception:
+                        pass
+
+                # 2h. Tunggu callback OAuth selesai - JANGAN langsung close, beri waktu load IP
+                # Tunggu hingga LAST_REWRITE terisi atau timeout 60 dtk
+                print("[*] Menunggu callback localhost -> IP selesai...")
+                cb_start = time.time()
+                while time.time() - cb_start < 60:
+                    if LAST_REWRITE["url"]:
+                        break
+                    try:
+                        if popup.is_closed():
+                            break
+                        cur = popup.url
+                        if "callback" in cur:
+                            print(f"[*] Popup URL callback: {cur}")
+                            break
+                    except Exception:
+                        pass
+                    time.sleep(1)
+
+                if LAST_REWRITE["url"]:
+                    print(f"[*] Menavigasikan tab popup ke callback server IP...")
+                    # Langsung catat sukses & pindahkan akun seketika tanpa menunggu timer selesai
+                    move_account(email, gpw, "SUCCESS")
+                    print(f"[✓] PROSES AKUN SUKSES: {email} -> langsung dicatat & dipindahkan.")
+                    
+                    try:
+                        if not popup.is_closed():
+                            popup.goto(LAST_REWRITE["url"], wait_until="domcontentloaded", timeout=15000)
+                            print("[*] Navigasi ke callback IP selesai.")
+                    except Exception as e:
+                        print(f"[*] Info navigasi popup: {e}")
+
+                    print("[*] Tunggu 5 detik agar server 9Router menyelesaikan impor akun...")
+                    time.sleep(5)
+                    try:
+                        page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=10000)
+                        time.sleep(2)
+                    except Exception as e:
+                        pass
+                    # Menunggu tab close sendiri atau beri waktu tambahan
+                    try:
+                        if not popup.is_closed():
+                            print("[*] Menunggu tab ditutup secara otomatis oleh sistem...")
+                            popup.wait_for_event("close", timeout=15000)
+                            print("[*] Tab ditutup otomatis.")
+                        else:
+                            print("[*] Tab sudah ditutup secara otomatis.")
+                    except Exception:
+                        try:
+                            if not popup.is_closed():
+                                popup.close()
+                        except Exception:
+                            pass
                 else:
-                    error_reason = "Email tidak terdeteksi pada halaman provider setelah callback"
-                
-                # Menunggu tab close sendiri atau beri waktu tambahan
-                try:
-                    if not popup.is_closed():
-                        print("[*] Menunggu tab ditutup secara otomatis oleh sistem (15 detik max)...")
-                        popup.wait_for_event("close", timeout=15000)
-                        print("[*] Tab ditutup otomatis.")
-                    else:
-                        print("[*] Tab sudah ditutup secara otomatis.")
-                except Exception:
+                    print(f"[!] Callback tidak terdeteksi (Timeout)")
                     try:
                         if not popup.is_closed():
                             popup.close()
                     except Exception:
                         pass
-            else:
-                error_reason = "Callback OAuth tidak terdeteksi (LAST_REWRITE kosong)"
-                print(f"[!] {error_reason}")
-                try:
-                    if not popup.is_closed():
-                        popup.close()
-                except Exception:
-                    pass
+                    move_account(email, gpw, "FAILED", "Callback OAuth tidak terdeteksi (Timeout)")
+                    print(f"[✗] PROSES AKUN GAGAL: {email} -> dipindahkan ke failed_accounts.txt")
 
-            # Pemindahan akun secara otomatis berdasarkan status hasil
-            if account_success:
-                move_account(email, gpw, "SUCCESS")
-                print(f"[✓] PROSES AKUN SUKSES: {email} dipindahkan ke {PROCESSED_ACCOUNTS_FILE}")
-            else:
-                move_account(email, gpw, "FAILED", error_reason)
-                print(f"[✗] PROSES AKUN GAGAL: {email} dipindahkan ke {FAILED_ACCOUNTS_FILE}")
+            except Exception as e_account:
+                print(f"[!] Error saat memproses akun {email}: {e_account}")
+                move_account(email, gpw, "FAILED", str(e_account)[:100])
+                print(f"[*] Melanjutkan ke akun berikutnya...")
 
-            if RESTART_BROWSER_PER_ACCOUNT:
-                print(f"[*] Tutup browser/context setelah selesai akun {idx}...")
-                try:
-                    context.close()
-                except Exception:
-                    pass
-
-            time.sleep(2)
+            finally:
+                if RESTART_BROWSER_PER_ACCOUNT:
+                    print(f"[*] Tutup browser/context setelah selesai akun {idx}...")
+                    try:
+                        context.close()
+                    except Exception:
+                        pass
+                print("[*] Jeda 5 detik sebelum lanjut akun berikutnya...")
+                time.sleep(5)
 
         print("\n[*] Semua akun selesai diproses. Biarkan terbuka 15 detik.")
         time.sleep(15)

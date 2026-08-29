@@ -14,22 +14,30 @@ venv/
 env/
 *.egg-info/
 pip-log.txt
+*.tmp
 
-# Playwright
+# Playwright & Browser Sessions
 browser_profile/
 browser_profile_test*/
 test-results/
 playwright-report/
 playwright/.cache/
 
-# Logs & data
+# Credentials, Config & Live Secrets
+.env
+accounts.txt
+data/accounts.txt
+data/processed_accounts.txt
+data/failed_accounts.txt
+
+# Runtime Logs
+logs/
 urls.txt
 flow.log
+app_flask.log
 *.log
-accounts.txt
-.env
 
-# OS
+# OS & Editor
 .DS_Store
 Thumbs.db
 .idea/

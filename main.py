@@ -10,16 +10,18 @@ import time
 import subprocess
 from pathlib import Path
 
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 LOGS_DIR = BASE_DIR / "logs"
 ENV_FILE = BASE_DIR / ".env"
 
-# Ensure directories exist
-DATA_DIR.mkdir(exist_ok=True)
-LOGS_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 ACCOUNTS_FILE = DATA_DIR / "accounts.txt"
+if not ACCOUNTS_FILE.exists() and (BASE_DIR / "accounts.txt").exists():
+    ACCOUNTS_FILE = BASE_DIR / "accounts.txt"
+
 PROCESSED_FILE = DATA_DIR / "processed_accounts.txt"
 FAILED_FILE = DATA_DIR / "failed_accounts.txt"
 
@@ -39,10 +41,8 @@ def print_banner():
     clear_screen()
     print(f"{CYAN}{BOLD}")
     print(r"  ╔══════════════════════════════════════════════════════════════════════╗")
-    print(r"  ║    ___  _  _ ___ _ ____ ____ ____ _  _ _ ___ _ me ___ ____ ____      ║")
-    print(r"  ║    |__| |\ |  |  | |  | |__/ |__| |  | |  |  | |__| |__/ |__|      ║")
-    print(r"  ║    |  | | \|  |  | |__| |  \ |  |  \/  |  |  | |  | |  \ |  |      ║")
-    print(r"  ║                --- Terminal Automation Engine v2.1 ---               ║")
+    print(r"  ║            --- Antigravity Automation Engine v2.5 ---                ║")
+    print(r"  ║                Terminal Console & Management CLI                     ║")
     print(r"  ╚══════════════════════════════════════════════════════════════════════╝")
     print(f"{RESET}")
 
@@ -70,26 +70,83 @@ def count_accounts():
         failed = len(lines)
     return pending, processed, failed
 
-def run_automation(headless=False):
+def requeue_failed_accounts():
+    """Pindahkan semua akun yang ada di failed_accounts.txt kembali ke antrean accounts.txt."""
+    if not FAILED_FILE.exists():
+        print(f"\n  {YELLOW}[!] File failed_accounts.txt tidak ditemukan.{RESET}")
+        time.sleep(1.5)
+        return
+    failed_lines = [l.strip() for l in FAILED_FILE.read_text(encoding="utf-8").splitlines() if l.strip()]
+    if not failed_lines:
+        print(f"\n  {YELLOW}[!] Tidak ada akun gagal untuk diulangi.{RESET}")
+        time.sleep(1.5)
+        return
+    
+    # Ekstrak email|pass
+    requeue_items = []
+    for l in failed_lines:
+        parts = l.split("|")
+        if len(parts) >= 2:
+            requeue_items.append(f"{parts[0].strip()}|{parts[1].strip()}")
+    
+    current_accs = ACCOUNTS_FILE.read_text(encoding="utf-8").splitlines() if ACCOUNTS_FILE.exists() else []
+    merged = [l.strip() for l in current_accs if l.strip()]
+    for item in requeue_items:
+        if item not in merged:
+            merged.append(item)
+            
+    ACCOUNTS_FILE.write_text("\n".join(merged) + ("\n" if merged else ""), encoding="utf-8")
+    if (DATA_DIR / "accounts.txt").exists():
+        (DATA_DIR / "accounts.txt").write_text("\n".join(merged) + ("\n" if merged else ""), encoding="utf-8")
+    if (BASE_DIR / "accounts.txt").exists():
+        (BASE_DIR / "accounts.txt").write_text("\n".join(merged) + ("\n" if merged else ""), encoding="utf-8")
+        
+    FAILED_FILE.write_text("", encoding="utf-8")
+    print(f"\n  {GREEN}[✓] Berhasil memindahkan {len(requeue_items)} akun gagal kembali ke antrean accounts.txt!{RESET}")
+    time.sleep(1.5)
+
+def run_automation(headless=True):
     py = detect_python()
     env = os.environ.copy()
     env["HEADLESS"] = "true" if headless else "false"
     env["PYTHONUNBUFFERED"] = "1"
     
-    mode_name = "HEADLESS (VPS)" if headless else "VISIBLE (Browser Kelihatan)"
+    mode_name = "HEADLESS (VPS Mode)" if headless else "VISIBLE (Browser GUI Mode)"
     print(f"\n{GREEN}[*] Memulai Automation Flow dalam mode {BOLD}{mode_name}{RESET}...")
-    print(f"{DIM}[*] Executing: {py} flow.py{RESET}\n")
+    print(f"{DIM}[*] Executing: {py} -u flow.py{RESET}\n")
     time.sleep(1)
     
     try:
-        proc = subprocess.run([py, "flow.py"], cwd=str(BASE_DIR), env=env)
-        print(f"\n{GREEN}[✓] Otomasi selesai dengan exit code {proc.returncode}{RESET}")
+        proc = subprocess.run([py, "-u", "flow.py"], cwd=str(BASE_DIR), env=env)
     except KeyboardInterrupt:
         print(f"\n{YELLOW}[!] Otomasi dihentikan oleh pengguna (Ctrl+C).{RESET}")
     except Exception as e:
         print(f"\n{RED}[!] Error menjalankan otomasi: {e}{RESET}")
     
-    input(f"\n{CYAN}Tekan [Enter] untuk kembali ke menu utama...{RESET}")
+    # Ringkasan hasil setelah eksekusi
+    print("\n" + "═" * 68)
+    pending, processed, failed = count_accounts()
+    print(f"  {BOLD}RINGKASAN HASIL OTOMASI:{RESET}")
+    print(f"    • {GREEN}Akun Berhasil Selesai :{RESET} {BOLD}{processed}{RESET} akun")
+    print(f"    • {RED}Akun Gagal / Timeout  :{RESET} {BOLD}{failed}{RESET} akun")
+    print(f"    • {CYAN}Sisa Dalam Antrean    :{RESET} {BOLD}{pending}{RESET} akun")
+    print("═" * 68)
+    
+    if failed > 0:
+        print(f"\n  {YELLOW}Pilihan Tindakan:{RESET}")
+        print(f"    {GREEN}[1]{RESET} Ulangi Jalankan Akun yang Gagal")
+        print(f"    {CYAN}[2]{RESET} Kembali ke Menu Utama")
+        print(f"    {RED}[0]{RESET} Keluar (Exit)")
+        sub_choice = input(f"\n  {CYAN}Pilih opsi [0-2]: {RESET}").strip()
+        if sub_choice == "1":
+            requeue_failed_accounts()
+            run_automation(headless=headless)
+            return
+        elif sub_choice == "0":
+            print(f"\n  {GREEN}[*] Keluar dari aplikasi. Sampai jumpa!{RESET}\n")
+            sys.exit(0)
+    else:
+        input(f"\n{CYAN}Tekan [Enter] untuk kembali ke menu utama...{RESET}")
 
 def start_web_ui():
     py = detect_python()
@@ -98,134 +155,48 @@ def start_web_ui():
     try:
         subprocess.run([py, "app.py"], cwd=str(BASE_DIR))
     except KeyboardInterrupt:
-        print(f"\n{YELLOW}[!] Web Server UI dihentikan.{RESET}")
+        print(f"\n{YELLOW}[*] Web UI server dihentikan.{RESET}")
     except Exception as e:
-        print(f"\n{RED}[!] Error Web Server: {e}{RESET}")
+        print(f"\n{RED}[!] Error menjalankan server: {e}{RESET}")
     input(f"\n{CYAN}Tekan [Enter] untuk kembali ke menu utama...{RESET}")
-
-def add_account_prompt():
-    print(f"\n{CYAN}{BOLD}=== TAMBAH AKUN BARU ==={RESET}")
-    email = input(f"{YELLOW}Masukkan Email Google (gmail): {RESET}").strip()
-    if not email or "@" not in email:
-        print(f"{RED}[!] Email tidak valid!{RESET}")
-        time.sleep(1.5)
-        return
-    password = input(f"{YELLOW}Masukkan Password Google: {RESET}").strip()
-    if not password:
-        print(f"{RED}[!] Password tidak boleh kosong!{RESET}")
-        time.sleep(1.5)
-        return
-    
-    line = f"{email}|{password}\n"
-    with open(ACCOUNTS_FILE, "a", encoding="utf-8") as f:
-        f.write(line)
-    print(f"{GREEN}[✓] Berhasil menambahkan {email} ke {ACCOUNTS_FILE}{RESET}")
-    time.sleep(1.5)
-
-def list_accounts_prompt():
-    print(f"\n{CYAN}{BOLD}=== DAFTAR AKUN DALAM ANTREAN ==={RESET}")
-    if not ACCOUNTS_FILE.exists():
-        print(f"{DIM}Antrean kosong.{RESET}")
-    else:
-        lines = [l.strip() for l in ACCOUNTS_FILE.read_text(encoding="utf-8").splitlines() if l.strip() and not l.strip().startswith("#")]
-        if not lines:
-            print(f"{DIM}Tidak ada akun dalam antrean.{RESET}")
-        else:
-            for idx, line in enumerate(lines, 1):
-                parts = line.split("|")
-                em = parts[0]
-                print(f"  {GREEN}{idx:02d}.{RESET} {em:<35} | {DIM}••••••••{RESET}")
-    
-    print(f"\n{CYAN}{BOLD}=== AKUN GAGAL (Need Requeue) ==={RESET}")
-    if FAILED_FILE.exists():
-        flines = [l.strip() for l in FAILED_FILE.read_text(encoding="utf-8").splitlines() if l.strip()]
-        for idx, line in enumerate(flines, 1):
-            parts = line.split("|")
-            em = parts[0] if len(parts) > 0 else ""
-            reason = parts[4] if len(parts) > 4 else "Gagal"
-            print(f"  {RED}{idx:02d}.{RESET} {em:<35} | {RED}{reason}{RESET}")
-    else:
-        print(f"{DIM}Tidak ada akun gagal.{RESET}")
-
-    input(f"\n{CYAN}Tekan [Enter] untuk kembali...{RESET}")
-
-def requeue_failed_prompt():
-    if not FAILED_FILE.exists() or not FAILED_FILE.read_text().strip():
-        print(f"\n{YELLOW}[!] Tidak ada akun gagal untuk di-requeue.{RESET}")
-        time.sleep(1.5)
-        return
-    
-    flines = [l.strip() for l in FAILED_FILE.read_text(encoding="utf-8").splitlines() if l.strip()]
-    print(f"\n{CYAN}{BOLD}=== REQUEUE AKUN GAGAL ==={RESET}")
-    for idx, line in enumerate(flines, 1):
-        parts = line.split("|")
-        print(f"  {RED}{idx:02d}.{RESET} {parts[0]}")
-    
-    choice = input(f"\n{YELLOW}Pilih nomor akun untuk diulangi (atau 'all' untuk semua, '0' batal): {RESET}").strip()
-    if choice == '0':
-        return
-    if choice.lower() == 'all':
-        with open(ACCOUNTS_FILE, "a", encoding="utf-8") as af:
-            for line in flines:
-                parts = line.split("|")
-                af.write(f"{parts[0]}|{parts[1]}\n")
-        FAILED_FILE.write_text("", encoding="utf-8")
-        print(f"{GREEN}[✓] Semua akun gagal berhasil dikembalikan ke antrean!{RESET}")
-    elif choice.isdigit() and 1 <= int(choice) <= len(flines):
-        target = flines[int(choice) - 1]
-        parts = target.split("|")
-        with open(ACCOUNTS_FILE, "a", encoding="utf-8") as af:
-            af.write(f"{parts[0]}|{parts[1]}\n")
-        
-        remaining = [l for i, l in enumerate(flines) if i != (int(choice) - 1)]
-        FAILED_FILE.write_text("\n".join(remaining) + ("\n" if remaining else ""), encoding="utf-8")
-        print(f"{GREEN}[✓] Akun {parts[0]} berhasil dikembalikan ke antrean!{RESET}")
-    else:
-        print(f"{RED}[!] Pilihan tidak valid!{RESET}")
-    time.sleep(1.5)
 
 def main_menu():
     while True:
         print_banner()
         pending, processed, failed = count_accounts()
+        print(f"  {BOLD}Status Antrean Akun:{RESET}")
+        print(f"    • {CYAN}Antrean Tersedia  :{RESET} {BOLD}{pending}{RESET} akun")
+        print(f"    • {GREEN}Berhasil Diimpor  :{RESET} {BOLD}{processed}{RESET} akun")
+        print(f"    • {RED}Gagal / Timeout   :{RESET} {BOLD}{failed}{RESET} akun")
+        print("  " + "─" * 68)
+        print(f"  {BOLD}Menu Pilihan:{RESET}")
+        print(f"    {GREEN}[1]{RESET} Jalankan Otomasi Headless (VPS - Rekomendasi)")
+        print(f"    {GREEN}[2]{RESET} Jalankan Otomasi Visible (Tampilan Browser)")
+        print(f"    {CYAN}[3]{RESET} Buka Flask Web Dashboard (Port 5000)")
+        print(f"    {YELLOW}[4]{RESET} Ulangi Semua Akun Gagal (Requeue Failed)")
+        print(f"    {YELLOW}[5]{RESET} Bersihkan Data & Riwayat")
+        print(f"    {RED}[0]{RESET} Keluar")
+        print("  " + "─" * 68)
         
-        print(f"  {BOLD}STATUS SIKLUS ANTREAN:{RESET}")
-        print(f"    • Antrean Belum Diproses : {YELLOW}{BOLD}{pending}{RESET} Akun")
-        print(f"    • Sukses Terimpor       : {GREEN}{BOLD}{processed}{RESET} Akun")
-        print(f"    • Gagal Terimpor        : {RED}{BOLD}{failed}{RESET} Akun")
-        print(f"  ──────────────────────────────────────────────────────────────────────")
-        print(f"  {BOLD}PILIH MENU OPERASI Terminal (TUI):{RESET}")
-        print(f"    {GREEN}1.{RESET} {BOLD}Start with Visible Mode{RESET}   (Browser Kelihatan - Windows/Desktop)")
-        print(f"    {GREEN}2.{RESET} {BOLD}Start with Headless Mode{RESET}  (Tanpa Display - Dedicated VPS)")
-        print(f"    {GREEN}3.{RESET} {BOLD}Start Web Server UI{RESET}       (Interface Browser http://localhost:5000)")
-        print(f"  ──────────────────────────────────────────────────────────────────────")
-        print(f"    {CYAN}4.{RESET} Tambah Akun Ke Antrean (Email & Password)")
-        print(f"    {CYAN}5.{RESET} Lihat Daftar Akun Antrean & Riwayat")
-        print(f"    {CYAN}6.{RESET} Ulangi Akun Gagal (Requeue Failed Accounts)")
-        print(f"  ──────────────────────────────────────────────────────────────────────")
-        print(f"    {RED}0.{RESET} Keluar dari Program")
-        print(f"  ──────────────────────────────────────────────────────────────────────")
-        
-        choice = input(f"  {BOLD}{GREEN}select_option > {RESET}").strip()
-        
+        choice = input(f"  {CYAN}Pilih opsi [0-5]: {RESET}").strip()
         if choice == "1":
-            run_automation(headless=False)
-        elif choice == "2":
             run_automation(headless=True)
+        elif choice == "2":
+            run_automation(headless=False)
         elif choice == "3":
             start_web_ui()
         elif choice == "4":
-            add_account_prompt()
+            requeue_failed_accounts()
         elif choice == "5":
-            list_accounts_prompt()
-        elif choice == "6":
-            requeue_failed_prompt()
+            confirm = input(f"\n  {RED}Yakin ingin mereset data riwayat processed & failed? (y/N): {RESET}").strip().lower()
+            if confirm == "y":
+                if PROCESSED_FILE.exists(): PROCESSED_FILE.write_text("", encoding="utf-8")
+                if FAILED_FILE.exists(): FAILED_FILE.write_text("", encoding="utf-8")
+                print(f"  {GREEN}[✓] Data riwayat dibersihkan.{RESET}")
+                time.sleep(1)
         elif choice == "0":
-            print(f"\n{GREEN}[*] Terima kasih! Program dihentikan.{RESET}\n")
-            sys.exit(0)
-        else:
-            print(f"\n{RED}[!] Pilihan tidak valid, coba lagi.{RESET}")
-            time.sleep(1)
+            print(f"\n  {GREEN}[*] Selesai. Sampai jumpa!{RESET}\n")
+            break
 
 if __name__ == "__main__":
     main_menu()

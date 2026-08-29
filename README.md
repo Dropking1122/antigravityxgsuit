@@ -119,20 +119,14 @@ Alur `flow.py:179` : login → `Add` → `I Understand, Continue` → popup Goog
 - CLI: stdout + `cat urls.txt` / `cat flow.log`
 
 ### Quick Start (singkat)
-**Windows**
-```bat
-install.bat
-# edit .env & accounts.txt via UI atau nano
-.venv\Scripts\activate
-python app.py  # UI di http://localhost:5000
+**Linux / Ubuntu VPS**
+```bash
+./start.sh
 ```
 
-**Ubuntu VPS**
-```bash
-chmod +x install.sh && ./install.sh
-nano .env && nano accounts.txt
-source .venv/bin/activate && python app.py
-# atau langsung: python flow.py
+**Windows**
+```bat
+start.bat
 ```
 
 ## Konfigurasi `.env`
