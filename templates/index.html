@@ -798,11 +798,6 @@
           </div>
         </div>
       </details>
-
-      <div class="form-group" style="margin-top: 10px;">
-        <label>URL Callback Logged (urls.txt)</label>
-        <textarea id="urls" rows="4" readonly placeholder="Belum ada URL callback tercatat..."></textarea>
-      </div>
     </div>
 
     <!-- PROCESS LOGS -->
@@ -1334,8 +1329,6 @@ async function pollLogs() {
       
       logElem.innerHTML = formatted;
     }
-    
-    document.getElementById('urls').value = (j.urls_tail || []).join('\n');
     
     if (document.getElementById('autoScroll').checked) {
       logElem.scrollTop = logElem.scrollHeight;

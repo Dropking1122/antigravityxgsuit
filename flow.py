@@ -200,26 +200,6 @@ def verify_account_imported(page, email: str) -> bool:
         return False
 
 
-def log_url(url: str):
-    """Simpan URL ke file log (1 baris per URL). Aman dari duplikat berurutan."""
-    if not url:
-        return
-    try:
-        if os.path.exists(URL_LOG_FILE):
-            with open(URL_LOG_FILE, "r", encoding="utf-8") as f:
-                lines = f.read().splitlines()
-            if lines and lines[-1] == url:
-                return
-    except Exception:
-        pass
-    try:
-        with open(URL_LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(url + "\n")
-        print(f"[*] Log URL: {url}")
-    except Exception as e:
-        print(f"[!] Gagal tulis log URL: {e}")
-
-
 def _rewrite_redirect(route):
     """Bila browser mencoba melakukan navigasi ke localhost, cegah koneksi langsung
     dan alihkan (redirect) langsung ke IP host server."""
@@ -234,19 +214,13 @@ def _rewrite_redirect(route):
         is_real_callback = ("/callback?" in url and "code=" in url) or ("/callback" in url and "code=" in url and "state=" in url)
         if is_real_callback:
             LAST_REWRITE["url"] = new_url
-            log_url(url)
-            log_url(new_url)
-            print(f"[*] Callback localhost terdeteksi ({url}) -> langsung redirect ke IP ({new_url})")
+            print(f"[*] [Get URL] Callback OAuth Localhost terdeteksi")
+            print(f"[*] [Rewrite URL] Berhasil mengubah target dari Localhost -> Server IP: {new_netloc}")
+            print(f"[*] [Hit URL] Menghubungkan ke callback server IP...")
             route.fulfill(status=302, headers={"Location": new_url})
             return
         route.continue_(url=new_url)
     else:
-        try:
-            ip_host_dyn = REDIRECT_TO.split("://", 1)[-1].split(":", 1)[0]
-        except Exception:
-            ip_host_dyn = "38.47.85.35"
-        if ("/callback" in url or "code=" in url) and (ip_host_dyn in url or "38.47.85.35" in url or "43.133.41.179" in url):
-            log_url(url)
         route.continue_()
 
 
@@ -672,8 +646,8 @@ def run():
             error_reason = ""
 
             if LAST_REWRITE["url"]:
-                print(f"[*] Callback IP berhasil diproses: {LAST_REWRITE['url']}")
-                print("[*] Tunggu 5 detik agar server 9Router menyelesaikan impor akun...")
+                print(f"[*] [Hit URL] Callback OAuth berhasil diterima oleh server 9Router!")
+                print("[*] Menunggu 5 detik agar server 9Router menyelesaikan impor token akun...")
                 time.sleep(5)
                 
                 # Validasi apakah akun berhasil terimpor di halaman provider
