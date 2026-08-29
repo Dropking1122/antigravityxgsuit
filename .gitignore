@@ -1,3 +1,8 @@
+# Audit
+AUDIT.md
+audit.md
+*.audit
+
 # Archives
 *.zip
 *.tar.gz
