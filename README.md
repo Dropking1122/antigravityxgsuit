@@ -9,6 +9,39 @@ Otomasi `flow.py` untuk login dashboard 9Router (`<IP>:<PORT>`) → `/dashboard/
 - `RESTART_BROWSER_PER_ACCOUNT=true` close & buka browser baru tiap akun (solusi VPS).
 - Auto fixed `LAST_REWRITE` hanya untuk `/callback?code=` (tidak tertimpa static `woff2/css`).
 
+## Struktur Project Terorganisir
+```
+testantigravity/
+├── main.py                # Terminal CLI Menu Interactive (TUI)
+├── flow.py                # Engine otomasi Playwright
+├── app.py                 # Web Server Flask UI (http://localhost:5000)
+├── install.sh             # Script installer Linux/Ubuntu VPS
+├── install.bat            # Script installer Windows
+├── requirements.txt       # Dependencies Python
+├── .env                   # Configuration file (terisolasi)
+├── data/                  # Direktori data akun (terisolasi)
+│   ├── accounts.txt       # Antrean akun belum diproses
+│   ├── processed_accounts.txt  # Akun berhasil terimpor
+│   └── failed_accounts.txt     # Akun gagal / butuh requeue
+├── logs/                  # Direktori log (terisolasi)
+│   └── flow.log           # Output console log
+└── templates/             # HTML Templates untuk Web UI
+    └── index.html         # Web Dashboard Interface
+```
+
+## Interactive Terminal Menu (TUI)
+Jalankan menu berbasis terminal interaktif:
+```bash
+python main.py
+```
+Menu interaktif menyediakan opsi:
+1. `Start with Visible mode` (Browser Kelihatan)
+2. `Start with Headless mode` (Dedicated VPS)
+3. `Start Web Server UI` (`http://localhost:5000`)
+4. `Tambah Akun Ke Antrean`
+5. `Lihat Daftar Akun Antrean & Riwayat`
+6. `Ulangi Akun Gagal (Requeue Failed Accounts)`
+
 ## Langkah-Langkah Install dan Cara Penggunaan
 
 ### Prasyarat

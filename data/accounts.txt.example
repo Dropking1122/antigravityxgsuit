@@ -1,0 +1,4 @@
+your_account1@gmail.com|your_password1
+your_account2@gmail.com|your_password2
+# format: gmail|password per baris, baris kosong dan # diabaikan
+# contoh: myemail@gmail.com|mypassword123

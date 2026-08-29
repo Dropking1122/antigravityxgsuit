@@ -28,7 +28,7 @@ TARGET_URL = os.getenv("TARGET_URL", "http://localhost:20128/dashboard/providers
 PASSWORD = os.getenv("DASH_PASSWORD", "")
 PROFILE = os.getenv("USER_DATA_DIR", "./browser_profile")
 HEADLESS = os.getenv("HEADLESS", "false").lower() == "true"
-ACCOUNTS_FILE = os.getenv("ACCOUNTS_FILE", "accounts.txt")
+ACCOUNTS_FILE = os.getenv("ACCOUNTS_FILE", os.path.join("data", "accounts.txt"))
 # Kalau "true", hapus folder profil agar benar-benar fresh (akun Google lama hilang)
 RESET_PROFILE = os.getenv("RESET_PROFILE", "false").lower() == "true"
 # Jika true, tiap akun restart browser (fresh) agar account chooser tidak muncul - solusi VPS
@@ -40,10 +40,10 @@ CLEAR_EACH = os.getenv("CLEAR_EACH", "true").lower() == "true"
 REDIRECT_FROM = os.getenv("REDIRECT_FROM", "http://localhost:20128")
 REDIRECT_TO = os.getenv("REDIRECT_TO", "http://38.47.85.35:20128")
 
-# File log semua URL (terutama callback localhost / IP server), 1 URL per baris
-URL_LOG_FILE = os.getenv("URL_LOG_FILE", "urls.txt")
-PROCESSED_ACCOUNTS_FILE = os.getenv("PROCESSED_ACCOUNTS_FILE", "processed_accounts.txt")
-FAILED_ACCOUNTS_FILE = os.getenv("FAILED_ACCOUNTS_FILE", "failed_accounts.txt")
+# File log semua URL & Akun
+URL_LOG_FILE = os.getenv("URL_LOG_FILE", os.path.join("logs", "urls.txt"))
+PROCESSED_ACCOUNTS_FILE = os.getenv("PROCESSED_ACCOUNTS_FILE", os.path.join("data", "processed_accounts.txt"))
+FAILED_ACCOUNTS_FILE = os.getenv("FAILED_ACCOUNTS_FILE", os.path.join("data", "failed_accounts.txt"))
 
 # Menyimpan URL callback terakhir yang sudah di-rewrite ke IP
 # (dipakai untuk re-hit kalau tab keburu close)

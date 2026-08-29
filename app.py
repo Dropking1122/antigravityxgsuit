@@ -26,9 +26,15 @@ except ImportError:
 
 BASE_DIR = Path(__file__).parent
 ENV_FILE = BASE_DIR / ".env"
-ACCOUNTS_FILE_DEFAULT = "accounts.txt"
-URLS_FILE_DEFAULT = "urls.txt"
-LOG_FILE = BASE_DIR / "flow.log"
+DATA_DIR = BASE_DIR / "data"
+LOGS_DIR = BASE_DIR / "logs"
+
+DATA_DIR.mkdir(exist_ok=True)
+LOGS_DIR.mkdir(exist_ok=True)
+
+ACCOUNTS_FILE_DEFAULT = DATA_DIR / "accounts.txt"
+URLS_FILE_DEFAULT = LOGS_DIR / "urls.txt"
+LOG_FILE = LOGS_DIR / "flow.log"
 
 # Load env for Flask port/host
 if ENV_FILE.exists() and dotenv_values:
@@ -71,8 +77,8 @@ def read_env_config():
         "RESET_PROFILE": "false",
         "CLEAR_EACH": "true",
         "RESTART_BROWSER_PER_ACCOUNT": "false",
-        "ACCOUNTS_FILE": "accounts.txt",
-        "URL_LOG_FILE": "urls.txt",
+        "ACCOUNTS_FILE": os.path.join("data", "accounts.txt"),
+        "URL_LOG_FILE": os.path.join("logs", "urls.txt"),
         "USER_DATA_DIR": "./browser_profile",
         "FLASK_HOST": FLASK_HOST,
         "FLASK_PORT": str(FLASK_PORT),
@@ -406,8 +412,8 @@ def api_accounts():
 
 @app.route("/api/processed_accounts", methods=["GET", "POST"])
 def api_processed_accounts():
-    proc_file = BASE_DIR / "processed_accounts.txt"
-    fail_file = BASE_DIR / "failed_accounts.txt"
+    proc_file = DATA_DIR / "processed_accounts.txt"
+    fail_file = DATA_DIR / "failed_accounts.txt"
     
     if request.method == "GET":
         processed = []

@@ -19,6 +19,9 @@ pip install -r requirements.txt
 echo "[*] Install Playwright browser (chromium) dengan deps..."
 playwright install --with-deps chromium
 
+echo "[*] Buat direktori data/ dan logs/..."
+mkdir -p data logs
+
 echo "[*] Setup .env jika belum ada..."
 if [ ! -f .env ]; then
   cp .env.example .env
@@ -28,18 +31,17 @@ else
 fi
 
 echo "[*] Setup accounts.txt jika belum ada..."
-if [ ! -f accounts.txt ]; then
-  cp accounts.txt.example accounts.txt 2>/dev/null || echo "gmail1@example.com|password1" > accounts.txt
-  echo "[*] accounts.txt dibuat - isi dengan format gmail|password per baris"
+if [ ! -f data/accounts.txt ]; then
+  cp data/accounts.txt.example data/accounts.txt 2>/dev/null || cp accounts.txt.example data/accounts.txt 2>/dev/null || echo "gmail1@example.com|password1" > data/accounts.txt
+  echo "[*] data/accounts.txt dibuat - isi dengan format gmail|password per baris"
 fi
 
 echo ""
 echo "=== Selesai ==="
 echo "Cara jalan:"
 echo "  source .venv/bin/activate"
-echo "  # edit .env dan accounts.txt dulu"
-echo "  python flow.py                    # headless=false (butuh X) atau"
-echo "  HEADLESS=true python flow.py      # untuk VPS tanpa display"
-echo "  xvfb-run -a python flow.py        # visible virtual display"
+echo "  python main.py                    # Menu Terminal Interactive (TUI)"
+echo "  python app.py                     # Web Server UI http://localhost:5000"
+echo "  HEADLESS=true python flow.py      # Otomasi langsung mode VPS"
 echo ""
 echo "Untuk VPS Ubuntu headless disarankan .env: HEADLESS=true, CLEAR_EACH=true"
