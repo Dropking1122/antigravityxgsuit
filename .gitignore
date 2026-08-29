@@ -1,3 +1,9 @@
+# Archives
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+
 # Python
 __pycache__/
 *.py[cod]
