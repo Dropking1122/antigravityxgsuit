@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+pip-log.txt
+
+# Playwright
+browser_profile/
+browser_profile_test*/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Logs & data
+urls.txt
+flow.log
+*.log
+accounts.txt
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
