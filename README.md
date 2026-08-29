@@ -1,6 +1,6 @@
 # Antigravity Auto
 
-Otomasi `flow.py` untuk login dashboard 9Router (`38.47.85.35:20128`) → `/dashboard/providers/antigravity` → `Add` → `I Understand, Continue` → Google OAuth (isi email/pass, auto-klik `Sign in`/`Login`/`Continue`/`Allow`, rewrite `localhost:20128` → `38.47.85.35:20128`).
+Otomasi `flow.py` untuk login dashboard 9Router (`<IP>:<PORT>`) → `/dashboard/providers/antigravity` → `Add` → `I Understand, Continue` → Google OAuth (isi email/pass, auto-klik `Sign in`/`Login`/`Continue`/`Allow`, rewrite `localhost:20128` → `<IP>:<PORT>`).
 
 ## Fitur
 - Browser visible (`HEADLESS=false`) untuk handle verifikasi manual, auto-klik `Sign in` sekarang.
@@ -23,7 +23,7 @@ python flow.py
 ```bash
 chmod +x install.sh
 ./install.sh
-nano .env          # isi DASH_PASSWORD=Masuk123321, HEADLESS=true
+nano .env          # isi DASH_PASSWORD, HEADLESS=true, IP:PORT
 nano accounts.txt  # gmail|password per baris
 source .venv/bin/activate
 python flow.py
@@ -36,8 +36,9 @@ Lihat `.env.example`. Salin jadi `.env`:
 ```bash
 cp .env.example .env
 ```
-Penting:
-- `DASH_PASSWORD=Masuk123321` (password dashboard 9Router)
+Penting (isi di `.env`, jangan commit):
+- `DASH_PASSWORD` — password dashboard 9Router
+- `LOGIN_URL`/`TARGET_URL`/`REDIRECT_TO` — `http://<IP>:<PORT>/...` (diatur via UI atau `.env`)
 - `HEADLESS=false` visible, `true` untuk VPS tanpa display
 - `RESET_PROFILE=true` hapus `browser_profile` tiap run (fresh)
 - `CLEAR_EACH=true` bersihkan cookie tiap akun (fix akun 2)
@@ -55,7 +56,7 @@ $env:HEADLESS="false"; python flow.py
 - `playwright TimeoutError Next` → pastikan `accounts.txt` format `gmail|password`, cek Google block bot (jalankan `HEADLESS=false`).
 - Akun ke-2 stuck `accountchooser` → aktifkan `CLEAR_EACH=true` atau `RESTART_BROWSER_PER_ACCOUNT=true`.
 - `localhost` tidak keganti IP → sudah di-fix di `flow.py:138` rewrite `localhost` → `REDIRECT_TO` (hanya callback `code=` yang disimpan).
-- Password login salah → cek `DASH_PASSWORD` di `.env`, default `Masuk123321`.
+- Password login salah → cek `DASH_PASSWORD` di `.env`.
 
 ## Web UI (baru)
 IP:PORT sekarang tersimpan di `.env` (`REDIRECT_TO`, `LOGIN_URL`, `TARGET_URL`) dan bisa diedit via UI.

@@ -48,13 +48,13 @@
   <div class="card">
     <h2>Konfigurasi IP:PORT (.env)</h2>
     <div class="row">
-      <div><label>IP Server</label><input id="cfg_ip" placeholder="38.47.85.35"/></div>
-      <div><label>Port</label><input id="cfg_port" placeholder="20128"/></div>
+      <div><label>IP Server</label><input id="cfg_ip" placeholder="YOUR_IP"/></div>
+      <div><label>Port</label><input id="cfg_port" placeholder="PORT"/></div>
     </div>
     <label>Pratinjau</label>
     <input id="preview_url" readonly style="background:#082f49"/>
     <div class="row">
-      <div><label>DASH_PASSWORD</label><input id="cfg_pass" type="password" placeholder="Masuk123321"/></div>
+      <div><label>DASH_PASSWORD</label><input id="cfg_pass" type="password" placeholder="YOUR_DASH_PASSWORD"/></div>
       <div><label>FLASK_PORT (UI)</label><input id="cfg_flaskport" placeholder="5000"/></div>
     </div>
     <div class="row3">
@@ -80,8 +80,31 @@
   <!-- ACCOUNTS -->
   <div class="card">
     <h2>Accounts.txt <small id="accInfo"></small></h2>
-    <label>Format: <code>gmail|password</code> per baris (# komentar diabaikan)</label>
-    <textarea id="accounts" rows="8" placeholder="ade1@paragadis.com|elmanuk123&#10;ade2@paragadis.com|elmanuk123"></textarea>
+    <div style="background:#0b1222;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+      <label style="margin:0 0 8px;font-weight:600;color:var(--text)">Tambah Akun (mudah)</label>
+      <div class="row">
+        <div><label>Email (gmail)</label><input id="new_email" placeholder="your@gmail.com" type="email"/></div>
+        <div><label>Password</label><input id="new_pass" placeholder="your_password" type="text"/></div>
+      </div>
+      <div class="flex" style="margin-top:8px">
+        <button class="btn btn-primary" onclick="addAccount()">➕ Tambah ke Daftar</button>
+        <button class="btn" onclick="document.getElementById('new_email').value='';document.getElementById('new_pass').value='';">✖ Clear</button>
+        <small id="addMsg"></small>
+      </div>
+      <div id="accTableWrap" style="margin-top:12px;max-height:160px;overflow:auto;border:1px solid var(--border);border-radius:8px;display:none">
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <thead style="position:sticky;top:0;background:#1e293b"><tr><th style="padding:6px;text-align:left">#</th><th style="padding:6px;text-align:left">Email</th><th style="padding:6px;text-align:left">Password</th><th style="padding:6px"></th></tr></thead>
+          <tbody id="accTable"></tbody>
+        </table>
+      </div>
+      <div class="flex" style="margin-top:8px">
+        <button class="btn" onclick="syncTableToTextarea()">⬇ Sync Tabel → Textarea</button>
+        <button class="btn" onclick="syncTextareaToTable()">⬆ Sync Textarea → Tabel</button>
+        <button class="btn" onclick="if(confirm('Hapus semua akun?')){document.getElementById('accounts').value='';saveAccounts();renderTable();}">🗑 Hapus Semua</button>
+      </div>
+    </div>
+    <label>Advanced: Edit langsung <code>gmail|password</code> per baris (# komentar diabaikan)</label>
+    <textarea id="accounts" rows="6" placeholder="your@gmail.com|your_password&#10;another@gmail.com|pass2"></textarea>
     <div class="flex" style="margin-top:8px">
       <button class="btn btn-primary" onclick="saveAccounts()">💾 Simpan accounts.txt</button>
       <small id="accMsg"></small>
@@ -152,10 +175,11 @@ async function loadConfig(){
   document.getElementById('accCount').textContent=accLines+' akun';
   document.getElementById('accInfo').textContent='('+accLines+' akun)';
   updatePreview();
+  renderTable();
 }
 function updatePreview(){
-  const ip=document.getElementById('cfg_ip').value.trim()||'38.47.85.35';
-  const port=document.getElementById('cfg_port').value.trim()||'20128';
+  const ip=document.getElementById('cfg_ip').value.trim()||'YOUR_IP';
+  const port=document.getElementById('cfg_port').value.trim()||'PORT';
   const base='http://'+ip+':'+port;
   document.getElementById('preview_url').value=base;
   document.getElementById('cfg_to').value=base;
@@ -163,6 +187,59 @@ function updatePreview(){
   document.getElementById('cfg_target').value=base+'/dashboard/providers/antigravity';
 }
 ['cfg_ip','cfg_port'].forEach(id=>document.getElementById(id).addEventListener('input',updatePreview));
+// === Accounts helper (mudah tambah) ===
+function parseAccounts(){
+  const txt=document.getElementById('accounts').value;
+  return txt.split('\n').map(l=>l.trim()).filter(l=>l&&!l.startsWith('#')).map(l=>{
+    const p=l.split('|'); return {email:(p[0]||'').trim(), pass:(p[1]||'').trim(), raw:l}
+  }).filter(x=>x.email);
+}
+function renderTable(){
+  const accs=parseAccounts();
+  const tbody=document.getElementById('accTable');
+  const wrap=document.getElementById('accTableWrap');
+  tbody.innerHTML='';
+  if(accs.length===0){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  accs.forEach((a,i)=>{
+    const tr=document.createElement('tr');
+    tr.style.borderTop='1px solid var(--border)';
+    tr.innerHTML=`<td style="padding:6px">${i+1}</td><td style="padding:6px;word-break:break-all">${a.email}</td><td style="padding:6px;font-family:monospace">••••••</td><td style="padding:6px"><button class="btn" style="padding:4px 8px;font-size:11px" onclick="deleteAccount(${i})">✖</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function syncTextareaToTable(){ renderTable(); }
+function syncTableToTextarea(){
+  const accs=parseAccounts();
+  const txt=accs.map(a=>a.email+'|'+a.pass).join('\n');
+  document.getElementById('accounts').value=txt;
+  renderTable();
+}
+function addAccount(){
+  const email=document.getElementById('new_email').value.trim();
+  const pass=document.getElementById('new_pass').value.trim();
+  const msg=document.getElementById('addMsg');
+  if(!email||!pass){ msg.textContent='isi email & password'; setTimeout(()=>msg.textContent='',2000); return; }
+  if(!email.includes('@')||!email.includes('.')){ msg.textContent='email tidak valid'; setTimeout(()=>msg.textContent='',2000); return; }
+  const cur=document.getElementById('accounts').value.trim();
+  const line=email+'|'+pass;
+  // cek duplikat
+  if(cur.split('\n').some(l=>l.trim()===line)){ msg.textContent='sudah ada'; setTimeout(()=>msg.textContent='',2000); return; }
+  document.getElementById('accounts').value = cur ? cur+'\n'+line : line;
+  document.getElementById('new_email').value=''; document.getElementById('new_pass').value='';
+  msg.textContent='✓ ditambah (belum disimpan)'; setTimeout(()=>msg.textContent='',2000);
+  renderTable();
+  // auto save
+  saveAccounts();
+}
+function deleteAccount(idx){
+  const accs=parseAccounts();
+  accs.splice(idx,1);
+  document.getElementById('accounts').value=accs.map(a=>a.email+'|'+a.pass).join('\n');
+  renderTable();
+  saveAccounts();
+}
+document.getElementById('accounts').addEventListener('input', renderTable);
 async function saveConfig(){
   const payload={
     _IP: document.getElementById('cfg_ip').value.trim(),
