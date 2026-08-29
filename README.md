@@ -8,8 +8,8 @@ Otomasi auto-login & auto-import akun Google OAuth (GSuite) ke Provider Antigrav
 
 #### 1. Clone Repository
 ```bash
-git clone https://github.com/Dropking1122/testantigravity.git
-cd testantigravity
+git clone https://github.com/Dropking1122/antigravityxgsuit.git
+cd antigravityxgsuit
 ```
 
 #### 2. Jalankan Installer
