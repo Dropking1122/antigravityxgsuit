@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Antigravity Auto - UI</title>
+  <style>
+    :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--accent:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--text:#e2e8f0;--muted:#94a3b8}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+    header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px}
+    header h1{margin:0;font-size:18px} header small{color:var(--muted)}
+    .badge{padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
+    .badge-run{background:var(--ok);color:#052e16} .badge-stop{background:var(--border);color:var(--muted)}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+    .card h2{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+    label{font-size:12px;color:var(--muted);display:block;margin:8px 0 4px}
+    input,select,textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:#0b1222;color:var(--text);font-size:13px}
+    textarea{font-family:ui-monospace,Consolas,monospace;resize:vertical}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+    .btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:#0b1222;color:var(--text);cursor:pointer;font-weight:600;font-size:13px}
+    .btn:hover{border-color:var(--accent)} .btn-primary{background:var(--accent);color:#082f49;border-color:var(--accent)} .btn-danger{background:var(--err);border-color:var(--err);color:white}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .log{height:380px;overflow:auto;background:#020617;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    small{color:var(--muted)} .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .kpi{font-size:12px;color:var(--muted)} .kpi b{color:var(--text)}
+    hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Antigravity Auto <small>9Router</small></h1>
+    <div class="kpi">IP:PORT tersimpan di <b>.env</b> → <span id="ipport">-</span> • <span id="accCount">0 akun</span> • <span id="urlsCount">0 urls</span></div>
+  </div>
+  <div class="flex">
+    <span id="statusBadge" class="badge badge-stop">STOPPED</span>
+    <button class="btn btn-primary" id="btnStart" onclick="doStart()">▶ Start</button>
+    <button class="btn btn-danger" id="btnStop" onclick="doStop()" disabled>■ Stop</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- CONFIG IP:PORT -->
+  <div class="card">
+    <h2>Konfigurasi IP:PORT (.env)</h2>
+    <div class="row">
+      <div><label>IP Server</label><input id="cfg_ip" placeholder="38.47.85.35"/></div>
+      <div><label>Port</label><input id="cfg_port" placeholder="20128"/></div>
+    </div>
+    <label>Pratinjau</label>
+    <input id="preview_url" readonly style="background:#082f49"/>
+    <div class="row">
+      <div><label>DASH_PASSWORD</label><input id="cfg_pass" type="password" placeholder="Masuk123321"/></div>
+      <div><label>FLASK_PORT (UI)</label><input id="cfg_flaskport" placeholder="5000"/></div>
+    </div>
+    <div class="row3">
+      <label><input type="checkbox" id="cfg_headless"/> HEADLESS (true=VPS)</label>
+      <label><input type="checkbox" id="cfg_reset"/> RESET_PROFILE</label>
+      <label><input type="checkbox" id="cfg_clear"/> CLEAR_EACH</label>
+    </div>
+    <label><input type="checkbox" id="cfg_restart"/> RESTART_BROWSER_PER_ACCOUNT (close tiap akun)</label>
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted)">Advanced (LOGIN_URL / TARGET_URL / REDIRECT)</summary>
+      <label>LOGIN_URL</label><input id="cfg_login"/>
+      <label>TARGET_URL</label><input id="cfg_target"/>
+      <label>REDIRECT_FROM</label><input id="cfg_from"/>
+      <label>REDIRECT_TO</label><input id="cfg_to"/>
+    </details>
+    <div class="flex" style="margin-top:12px">
+      <button class="btn btn-primary" onclick="saveConfig()">💾 Simpan .env</button>
+      <button class="btn" onclick="loadConfig()">↻ Reload</button>
+      <small id="cfgMsg"></small>
+    </div>
+    <small>IP:PORT otomatis rakit jadi <b>REDIRECT_TO</b>, <b>LOGIN_URL</b>, <b>TARGET_URL</b> saat simpan.</small>
+  </div>
+
+  <!-- ACCOUNTS -->
+  <div class="card">
+    <h2>Accounts.txt <small id="accInfo"></small></h2>
+    <label>Format: <code>gmail|password</code> per baris (# komentar diabaikan)</label>
+    <textarea id="accounts" rows="8" placeholder="ade1@paragadis.com|elmanuk123&#10;ade2@paragadis.com|elmanuk123"></textarea>
+    <div class="flex" style="margin-top:8px">
+      <button class="btn btn-primary" onclick="saveAccounts()">💾 Simpan accounts.txt</button>
+      <small id="accMsg"></small>
+    </div>
+    <hr/>
+    <div class="grid2">
+      <div><label>urls.txt (log callback)</label><textarea id="urls" rows="5" readonly></textarea></div>
+      <div>
+        <label>Info</label>
+        <div class="kpi">Status: <b id="runStatus">-</b> • PID: <b id="pid">-</b></div>
+        <div class="kpi">Log lines: <b id="logCount">0</b></div>
+        <div style="margin-top:8px" class="flex">
+          <button class="btn" onclick="clearLogs()">🧹 Clear Log</button>
+          <button class="btn" onclick="pollLogs()">↻ Refresh</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card" style="grid-column:1/-1">
+    <div class="flex" style="justify-content:space-between">
+      <h2>Log (flow.py + rewrite)</h2>
+      <label style="margin:0"><input type="checkbox" id="autoScroll" checked/> auto-scroll</label>
+    </div>
+    <div id="log" class="log">Menunggu...</div>
+  </div>
+</div>
+
+<script>
+let polling=null;
+function setBadge(running, pid){
+  const b=document.getElementById('statusBadge');
+  const s=document.getElementById('runStatus');
+  const p=document.getElementById('pid');
+  const btnS=document.getElementById('btnStart');
+  const btnSt=document.getElementById('btnStop');
+  if(running){
+    b.textContent='RUNNING'+(pid?' #'+pid:''); b.className='badge badge-run';
+    s.textContent='RUNNING'; p.textContent=pid||'-';
+    btnS.disabled=true; btnSt.disabled=false;
+  } else {
+    b.textContent='STOPPED'; b.className='badge badge-stop';
+    s.textContent='STOPPED'; p.textContent='-';
+    btnS.disabled=false; btnSt.disabled=true;
+  }
+}
+async function loadConfig(){
+  const r=await fetch('/api/config'); const j=await r.json();
+  const c=j.config||{};
+  document.getElementById('cfg_ip').value=c._IP||'';
+  document.getElementById('cfg_port').value=c._PORT||'';
+  document.getElementById('cfg_pass').value=c.DASH_PASSWORD||'';
+  document.getElementById('cfg_flaskport').value=c.FLASK_PORT||'5000';
+  document.getElementById('cfg_headless').checked=(c.HEADLESS||'false')==='true';
+  document.getElementById('cfg_reset').checked=(c.RESET_PROFILE||'false')==='true';
+  document.getElementById('cfg_clear').checked=(c.CLEAR_EACH||'true')==='true';
+  document.getElementById('cfg_restart').checked=(c.RESTART_BROWSER_PER_ACCOUNT||'false')==='true';
+  document.getElementById('cfg_login').value=c.LOGIN_URL||'';
+  document.getElementById('cfg_target').value=c.TARGET_URL||'';
+  document.getElementById('cfg_from').value=c.REDIRECT_FROM||'';
+  document.getElementById('cfg_to').value=c.REDIRECT_TO||'';
+  document.getElementById('preview_url').value=c.REDIRECT_TO||'';
+  document.getElementById('ipport').textContent=c._IP_PORT||'-';
+  document.getElementById('accounts').value=j.accounts||'';
+  document.getElementById('urls').value=j.urls||'';
+  const accLines=(j.accounts||'').split('\n').filter(l=>l.trim()&&!l.trim().startsWith('#')).length;
+  document.getElementById('accCount').textContent=accLines+' akun';
+  document.getElementById('accInfo').textContent='('+accLines+' akun)';
+  updatePreview();
+}
+function updatePreview(){
+  const ip=document.getElementById('cfg_ip').value.trim()||'38.47.85.35';
+  const port=document.getElementById('cfg_port').value.trim()||'20128';
+  const base='http://'+ip+':'+port;
+  document.getElementById('preview_url').value=base;
+  document.getElementById('cfg_to').value=base;
+  document.getElementById('cfg_login').value=base+'/login';
+  document.getElementById('cfg_target').value=base+'/dashboard/providers/antigravity';
+}
+['cfg_ip','cfg_port'].forEach(id=>document.getElementById(id).addEventListener('input',updatePreview));
+async function saveConfig(){
+  const payload={
+    _IP: document.getElementById('cfg_ip').value.trim(),
+    _PORT: document.getElementById('cfg_port').value.trim(),
+    DASH_PASSWORD: document.getElementById('cfg_pass').value,
+    HEADLESS: document.getElementById('cfg_headless').checked?'true':'false',
+    RESET_PROFILE: document.getElementById('cfg_reset').checked?'true':'false',
+    CLEAR_EACH: document.getElementById('cfg_clear').checked?'true':'false',
+    RESTART_BROWSER_PER_ACCOUNT: document.getElementById('cfg_restart').checked?'true':'false',
+    FLASK_PORT: document.getElementById('cfg_flaskport').value,
+    // advanced override jika user edit manual
+    LOGIN_URL: document.getElementById('cfg_login').value,
+    TARGET_URL: document.getElementById('cfg_target').value,
+    REDIRECT_FROM: document.getElementById('cfg_from').value,
+    REDIRECT_TO: document.getElementById('cfg_to').value,
+  };
+  const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const j=await r.json();
+  document.getElementById('cfgMsg').textContent = j.ok ? '✓ tersimpan' : '✗ '+(j.error||'gagal');
+  setTimeout(()=>document.getElementById('cfgMsg').textContent='',2000);
+  loadConfig();
+}
+async function saveAccounts(){
+  const content=document.getElementById('accounts').value;
+  const r=await fetch('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});
+  const j=await r.json();
+  document.getElementById('accMsg').textContent=j.ok?`✓ ${j.lines} akun`:'✗ gagal';
+  setTimeout(()=>document.getElementById('accMsg').textContent='',2000);
+  loadConfig();
+}
+async function doStart(){
+  const r=await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clear_log:false})});
+  const j=await r.json();
+  if(!r.ok) alert(j.error||'gagal start');
+  pollLogs();
+}
+async function doStop(){
+  const r=await fetch('/api/stop',{method:'POST'});
+  const j=await r.json();
+  if(!r.ok) alert(j.error||'gagal stop');
+}
+async function pollLogs(){
+  const r=await fetch('/api/logs?tail=800'); const j=await r.json();
+  setBadge(j.running, j.pid);
+  document.getElementById('logCount').textContent=j.log_count;
+  document.getElementById('urlsCount').textContent=j.urls_count;
+  document.getElementById('log').textContent=(j.logs||[]).join('\n');
+  document.getElementById('urls').value=(j.urls_tail||[]).join('\n');
+  if(j.urls_count) document.getElementById('urlsCount').textContent=j.urls_count+' urls';
+  if(document.getElementById('autoScroll').checked){
+    const el=document.getElementById('log'); el.scrollTop=el.scrollHeight;
+  }
+}
+async function clearLogs(){
+  await fetch('/api/clear_logs',{method:'POST'});
+  pollLogs();
+}
+loadConfig(); pollLogs();
+setInterval(pollLogs,1500);
+</script>
+</body>
+</html>

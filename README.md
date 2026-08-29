@@ -57,9 +57,33 @@ $env:HEADLESS="false"; python flow.py
 - `localhost` tidak keganti IP → sudah di-fix di `flow.py:138` rewrite `localhost` → `REDIRECT_TO` (hanya callback `code=` yang disimpan).
 - Password login salah → cek `DASH_PASSWORD` di `.env`, default `Masuk123321`.
 
+## Web UI (baru)
+IP:PORT sekarang tersimpan di `.env` (`REDIRECT_TO`, `LOGIN_URL`, `TARGET_URL`) dan bisa diedit via UI.
+
+```bash
+# install Flask (sudah di requirements.txt)
+pip install -r requirements.txt
+python app.py
+# buka http://localhost:5000  (atau http://<VPS_IP>:5000)
+```
+Fitur UI:
+- **Config IP:PORT** — isi IP & Port, auto-rakit `REDIRECT_TO`/`LOGIN_URL`/`TARGET_URL`, simpan ke `.env` (tombol *Simpan .env*)
+- **Accounts** — edit `accounts.txt` langsung
+- **Start / Stop** — jalankan `flow.py` visible/headless sesuai `.env`, tampilkan log real-time + `urls.txt`
+- Log di `flow.log`, auto-scroll, `Clear Log`
+
+Untuk VPS Ubuntu buka port `5000`:
+```bash
+sudo ufw allow 5000
+FLASK_HOST=0.0.0.0 FLASK_PORT=5000 python app.py
+# atau via systemd / tmux
+```
+
 ## File
 - `flow.py` — alur utama
-- `requirements.txt` — `playwright==1.62.0`
+- `app.py` — Flask UI (start/stop + log + config IP:PORT)
+- `templates/index.html` — UI
+- `requirements.txt` — `playwright==1.62.0` + `Flask==3.0.3`
 - `install.sh` / `install.bat` — installer
 - `accounts.txt.example` — contoh akun
 - `urls.txt` — log URL callback (auto generate)
@@ -69,4 +93,5 @@ $env:HEADLESS="false"; python flow.py
 git clone https://github.com/Dropking1122/testantigravity.git
 cd testantigravity
 ./install.sh
+python app.py  # UI
 ```
