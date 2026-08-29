@@ -404,6 +404,69 @@ def api_accounts():
         acc_path.write_text(content, encoding="utf-8")
         return jsonify({"ok": True, "lines": len([l for l in content.splitlines() if l.strip()])})
 
+@app.route("/api/processed_accounts", methods=["GET", "POST"])
+def api_processed_accounts():
+    proc_file = BASE_DIR / "processed_accounts.txt"
+    fail_file = BASE_DIR / "failed_accounts.txt"
+    
+    if request.method == "GET":
+        processed = []
+        failed = []
+        if proc_file.exists():
+            for line in proc_file.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    parts = line.strip().split("|")
+                    processed.append({
+                        "email": parts[0] if len(parts) > 0 else "",
+                        "pass": parts[1] if len(parts) > 1 else "",
+                        "status": parts[2] if len(parts) > 2 else "SUCCESS",
+                        "time": parts[3] if len(parts) > 3 else "",
+                    })
+        if fail_file.exists():
+            for line in fail_file.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    parts = line.strip().split("|")
+                    failed.append({
+                        "email": parts[0] if len(parts) > 0 else "",
+                        "pass": parts[1] if len(parts) > 1 else "",
+                        "status": parts[2] if len(parts) > 2 else "FAILED",
+                        "time": parts[3] if len(parts) > 3 else "",
+                        "reason": parts[4] if len(parts) > 4 else "Unknown Error",
+                    })
+        return jsonify({"processed": processed, "failed": failed})
+    
+    elif request.method == "POST":
+        # Action: requeue failed account back to accounts.txt
+        data = request.get_json(force=True, silent=True) or {}
+        action = data.get("action")
+        email = data.get("email", "").strip()
+        
+        if action == "requeue" and email:
+            cfg = read_env_config()
+            acc_path = BASE_DIR / cfg.get("ACCOUNTS_FILE", "accounts.txt")
+            
+            # Read failed accounts and find matching email & pass
+            new_failed_lines = []
+            found_item = None
+            if fail_file.exists():
+                for line in fail_file.read_text(encoding="utf-8").splitlines():
+                    if line.strip():
+                        parts = line.strip().split("|")
+                        if parts[0].strip().lower() == email.lower() and not found_item:
+                            found_item = (parts[0].strip(), parts[1].strip() if len(parts) > 1 else "")
+                            continue
+                    new_failed_lines.append(line)
+                fail_file.write_text("\n".join(new_failed_lines) + ("\n" if new_failed_lines else ""), encoding="utf-8")
+            
+            if found_item:
+                current_accs = acc_path.read_text(encoding="utf-8") if acc_path.exists() else ""
+                new_entry = f"{found_item[0]}|{found_item[1]}"
+                updated_accs = (current_accs.strip() + "\n" + new_entry).strip() + "\n"
+                acc_path.write_text(updated_accs, encoding="utf-8")
+                return jsonify({"ok": True, "message": f"Akun {email} berhasil dimasukkan kembali ke antrean!"})
+        
+        return jsonify({"error": "Aksi tidak valid atau email tidak ditemukan"}), 400
+
 if __name__ == "__main__":
     # buat templates folder jika belum ada
     print(f"[*] Antigravity UI di http://{FLASK_HOST}:{FLASK_PORT}")

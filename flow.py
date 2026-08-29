@@ -14,6 +14,7 @@ Catatan: login Google via otomasi sering terblokir deteksi bot Google
 import os
 import time
 import shutil
+from datetime import datetime
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -41,6 +42,8 @@ REDIRECT_TO = os.getenv("REDIRECT_TO", "http://38.47.85.35:20128")
 
 # File log semua URL (terutama callback localhost / IP server), 1 URL per baris
 URL_LOG_FILE = os.getenv("URL_LOG_FILE", "urls.txt")
+PROCESSED_ACCOUNTS_FILE = os.getenv("PROCESSED_ACCOUNTS_FILE", "processed_accounts.txt")
+FAILED_ACCOUNTS_FILE = os.getenv("FAILED_ACCOUNTS_FILE", "failed_accounts.txt")
 
 # Menyimpan URL callback terakhir yang sudah di-rewrite ke IP
 # (dipakai untuk re-hit kalau tab keburu close)
@@ -105,6 +108,76 @@ def load_accounts(path: str):
                 accounts.append((email.strip(), pw.strip()))
     print(f"[*] Total akun dibaca: {len(accounts)}")
     return accounts
+
+
+def move_account(email: str, gpw: str, status: str, error_msg: str = ""):
+    """Pindahkan akun dari ACCOUNTS_FILE (accounts.txt) ke PROCESSED_ACCOUNTS_FILE
+    atau FAILED_ACCOUNTS_FILE."""
+    # 1. Catat ke file tujuan
+    target_file = PROCESSED_ACCOUNTS_FILE if status == "SUCCESS" else FAILED_ACCOUNTS_FILE
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"{email}|{gpw}|{status}|{timestamp}"
+    if error_msg:
+        log_entry += f"|{error_msg}"
+    
+    try:
+        with open(target_file, "a", encoding="utf-8") as f:
+            f.write(log_entry + "\n")
+        print(f"[*] Catat status akun {email} -> {status} di {target_file}")
+    except Exception as e:
+        print(f"[!] Gagal menulis ke {target_file}: {e}")
+
+    # 2. Hapus dari ACCOUNTS_FILE
+    if os.path.exists(ACCOUNTS_FILE):
+        try:
+            with open(ACCOUNTS_FILE, "r", encoding="utf-8") as f:
+                lines = f.read().splitlines()
+            new_lines = []
+            removed = False
+            for line in lines:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    new_lines.append(line)
+                    continue
+                if "|" in stripped:
+                    em, _ = stripped.split("|", 1)
+                    if em.strip().lower() == email.strip().lower() and not removed:
+                        removed = True
+                        continue
+                new_lines.append(line)
+            
+            with open(ACCOUNTS_FILE, "w", encoding="utf-8") as f:
+                f.write("\n".join(new_lines) + ("\n" if new_lines else ""))
+            print(f"[*] Akun {email} dipindahkan dari {ACCOUNTS_FILE}")
+        except Exception as e:
+            print(f"[!] Gagal memperbarui {ACCOUNTS_FILE}: {e}")
+
+
+def verify_account_imported(page, email: str) -> bool:
+    """Validasi apakah email yang diimpor muncul di halaman dashboard provider."""
+    print(f"[*] Memvalidasi apakah email {email} sudah terimpor di halaman provider...")
+    try:
+        page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=15000)
+        time.sleep(3)
+        # Cari text email di dalam DOM
+        content = page.content()
+        if email.lower() in content.lower():
+            print(f"[✓] VALIDASI SUKSES: Email {email} ditemukan pada halaman provider!")
+            return True
+        else:
+            # Coba selektor spesifik jika ada table/card
+            try:
+                elem = page.locator(f"text={email}").first
+                if elem.is_visible(timeout=3000):
+                    print(f"[✓] VALIDASI SUKSES (via locator): Email {email} terlihat!")
+                    return True
+            except Exception:
+                pass
+            print(f"[✗] VALIDASI GAGAL: Email {email} TIDAK ditemukan di halaman provider!")
+            return False
+    except Exception as e:
+        print(f"[!] Gagal saat melakukan validasi impor email: {e}")
+        return False
 
 
 def log_url(url: str):
@@ -573,40 +646,50 @@ def run():
                     pass
                 time.sleep(1)
 
+            account_success = False
+            error_reason = ""
+
             if LAST_REWRITE["url"]:
                 print(f"[*] Callback IP berhasil diproses: {LAST_REWRITE['url']}")
                 print("[*] Tunggu 5 detik agar server 9Router menyelesaikan impor akun...")
                 time.sleep(5)
-                try:
-                    print("[*] Navigasi ke halaman provider dashboard untuk mengecek status...")
-                    page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=10000)
-                    time.sleep(3)
-                except Exception as e:
-                    print(f"[!] Goto dashboard provider gagal: {e}")
+                
+                # Validasi apakah akun berhasil terimpor di halaman provider
+                if verify_account_imported(page, email):
+                    account_success = True
+                else:
+                    error_reason = "Email tidak terdeteksi pada halaman provider setelah callback"
+                
                 # Menunggu tab close sendiri atau beri waktu tambahan
                 try:
                     if not popup.is_closed():
-                        print("[*] Menunggu tab ditutup secara otomatis oleh sistem (30 detik max)...")
-                        popup.wait_for_event("close", timeout=30000)
+                        print("[*] Menunggu tab ditutup secara otomatis oleh sistem (15 detik max)...")
+                        popup.wait_for_event("close", timeout=15000)
                         print("[*] Tab ditutup otomatis.")
                     else:
                         print("[*] Tab sudah ditutup secara otomatis.")
                 except Exception:
-                    print("[*] Tab tidak ditutup otomatis, biarkan tetap terbuka tanpa dipaksa close.")
-            else:
-                print("[!] Callback tidak terdeteksi dalam 60 dtk (LAST_REWRITE kosong)")
-                print(f"[*] URL popup terakhir: {popup.url if not popup.is_closed() else 'closed'}")
-                # fallback: tunggu close lama seperti sebelumnya
-                try:
-                    popup.wait_for_event("close", timeout=30000)
-                    print("[*] Tab ditutup (fallback).")
-                except Exception:
-                    print("[*] Timeout fallback, lanjut akun berikutnya.")
                     try:
                         if not popup.is_closed():
                             popup.close()
                     except Exception:
                         pass
+            else:
+                error_reason = "Callback OAuth tidak terdeteksi (LAST_REWRITE kosong)"
+                print(f"[!] {error_reason}")
+                try:
+                    if not popup.is_closed():
+                        popup.close()
+                except Exception:
+                    pass
+
+            # Pemindahan akun secara otomatis berdasarkan status hasil
+            if account_success:
+                move_account(email, gpw, "SUCCESS")
+                print(f"[✓] PROSES AKUN SUKSES: {email} dipindahkan ke {PROCESSED_ACCOUNTS_FILE}")
+            else:
+                move_account(email, gpw, "FAILED", error_reason)
+                print(f"[✗] PROSES AKUN GAGAL: {email} dipindahkan ke {FAILED_ACCOUNTS_FILE}")
 
             if RESTART_BROWSER_PER_ACCOUNT:
                 print(f"[*] Tutup browser/context setelah selesai akun {idx}...")

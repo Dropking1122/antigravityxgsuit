@@ -38,7 +38,6 @@
       --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
       --shadow-md: 0 8px 16px rgba(0,0,0,0.25);
       --shadow-lg: 0 16px 32px rgba(0,0,0,0.35);
-      --shadow-glow: 0 0 20px rgba(56, 189, 248, 0.2);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -468,16 +467,12 @@
       color: var(--text-muted);
     }
 
-    .checkbox-tile input:checked + span {
-      color: var(--text);
-    }
-
     /* TABLE */
     .table-container {
       border: 1px solid var(--surface-border);
       border-radius: var(--radius-sm);
       overflow: hidden;
-      max-height: 220px;
+      max-height: 240px;
       overflow-y: auto;
       background: var(--field-bg);
     }
@@ -513,6 +508,16 @@
     tr:hover td {
       background: rgba(255,255,255,0.02);
     }
+
+    .badge-status {
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-success { background: var(--success-glow); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-failed { background: var(--danger-glow); color: var(--danger); border: 1px solid rgba(244,63,94,0.3); }
 
     /* LOG DISPLAY */
     .log-viewer {
@@ -598,7 +603,7 @@
         <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       </div>
       <div class="logo-text">
-        <h1>Antigravity Auto <span class="version">v2.0</span></h1>
+        <h1>Antigravity Auto <span class="version">v2.1</span></h1>
       </div>
     </div>
 
@@ -638,18 +643,18 @@
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       </div>
       <div class="stat-info">
-        <div class="stat-label">Total Akun</div>
+        <div class="stat-label">Akun Dalam Antrean</div>
         <div class="stat-value" id="statAccounts">0</div>
       </div>
     </div>
 
     <div class="stat-card">
       <div class="stat-icon">
-        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       </div>
       <div class="stat-info">
-        <div class="stat-label">Callback Logs</div>
-        <div class="stat-value" id="statUrls">0</div>
+        <div class="stat-label">Akun Berhasil / Gagal</div>
+        <div class="stat-value"><span id="statSuccess" style="color:var(--success)">0</span> / <span id="statFailed" style="color:var(--danger)">0</span></div>
       </div>
     </div>
 
@@ -668,7 +673,11 @@
   <div class="tabs-nav">
     <button class="tab-btn active" onclick="switchTab('dashboard')">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Dashboard Utama
+      Antrean & Automation Log
+    </button>
+    <button class="tab-btn" onclick="switchTab('processed')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Riwayat Akun Diproses
     </button>
     <button class="tab-btn" onclick="switchTab('settings')">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -683,14 +692,14 @@
       <div class="card-header">
         <div class="card-title">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-          Manajemen Akun
+          Antrean Akun (accounts.txt)
         </div>
         <span id="accInfo" class="toast-msg"></span>
       </div>
 
       <!-- Quick Add Form -->
       <div class="form-group">
-        <label>Tambah Akun Baru</label>
+        <label>Tambah Akun Ke Antrean</label>
         <div class="form-row">
           <input id="new_email" placeholder="contoh@gmail.com" type="email"/>
           <input id="new_pass" placeholder="Password Google" type="password"/>
@@ -708,7 +717,7 @@
       <!-- Table View -->
       <div class="form-group">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <label>Daftar Akun Terpasang</label>
+          <label>Akun Belum Diproses</label>
           <input id="searchAccount" class="search-box" placeholder="Cari email..." style="width: 140px; padding: 4px 8px; font-size: 11px;" oninput="renderTable()"/>
         </div>
         
@@ -729,12 +738,12 @@
 
       <!-- Raw Editor Expander -->
       <details>
-        <summary>Advanced Raw Text Editor (accounts.txt)</summary>
+        <summary>Advanced Raw Editor (accounts.txt)</summary>
         <div class="form-group" style="margin-top: 10px;">
           <textarea id="accounts" rows="5" placeholder="gmail1@gmail.com|password1&#10;gmail2@gmail.com|password2"></textarea>
           <div style="display: flex; gap: 8px; margin-top: 6px;">
             <button class="btn btn-primary btn-sm" onclick="saveAccounts()">Simpan Edit Text</button>
-            <button class="btn btn-danger btn-sm" onclick="if(confirm('Hapus semua akun?')){document.getElementById('accounts').value='';saveAccounts();renderTable();}">Hapus Semua</button>
+            <button class="btn btn-danger btn-sm" onclick="if(confirm('Hapus semua akun dari antrean?')){document.getElementById('accounts').value='';saveAccounts();renderTable();}">Hapus Semua</button>
           </div>
         </div>
       </details>
@@ -762,6 +771,57 @@
       </div>
 
       <div id="log" class="log-viewer">Menunggu proses dijalankan...</div>
+    </div>
+  </div>
+
+  <!-- TAB: PROCESSED ACCOUNTS -->
+  <div id="tab-processed" class="tab-content">
+    <div class="card" style="grid-column: 1 / -1;">
+      <div class="card-header">
+        <div class="card-title">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Riwayat Akun Diproses & Validasi Impor
+        </div>
+        <button class="btn btn-sm" onclick="loadProcessedAccounts()">↻ Refresh Riwayat</button>
+      </div>
+
+      <div class="form-row">
+        <!-- SUCCESS TABLE -->
+        <div class="form-group">
+          <label style="color:var(--success)">[✓] Akun Berhasil Impor (processed_accounts.txt)</label>
+          <div class="table-container" style="max-height: 380px;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 30px;">#</th>
+                  <th>Email</th>
+                  <th>Waktu Selesai</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="procTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- FAILED TABLE -->
+        <div class="form-group">
+          <label style="color:var(--danger)">[✗] Akun Gagal / Perlu Ulang (failed_accounts.txt)</label>
+          <div class="table-container" style="max-height: 380px;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 30px;">#</th>
+                  <th>Email</th>
+                  <th>Alasan Gagal</th>
+                  <th style="width: 80px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="failTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -864,6 +924,10 @@ function switchTab(tabId) {
   
   event.currentTarget.classList.add('active');
   document.getElementById('tab-' + tabId).classList.add('active');
+
+  if (tabId === 'processed') {
+    loadProcessedAccounts();
+  }
 }
 
 function setBadge(running, pid) {
@@ -917,8 +981,82 @@ async function loadConfig() {
     
     renderTable();
     updatePreview();
+    loadProcessedAccounts();
   } catch (err) {
     console.error('Failed to load config:', err);
+  }
+}
+
+async function loadProcessedAccounts() {
+  try {
+    const r = await fetch('/api/processed_accounts');
+    const j = await r.json();
+    
+    const proc = j.processed || [];
+    const fail = j.failed || [];
+    
+    document.getElementById('statSuccess').textContent = proc.length;
+    document.getElementById('statFailed').textContent = fail.length;
+    
+    // Render Success Table
+    const procTbody = document.getElementById('procTable');
+    procTbody.innerHTML = '';
+    if (proc.length === 0) {
+      procTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-dim); padding:16px;">Belum ada akun berhasil terimpor.</td></tr>';
+    } else {
+      proc.forEach((item, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td style="font-weight:600; color:var(--text);">${escapeHtml(item.email)}</td>
+          <td style="color:var(--text-dim); font-size:11px;">${escapeHtml(item.time || '-')}</td>
+          <td><span class="badge-status badge-success">SUKSES</span></td>
+        `;
+        procTbody.appendChild(tr);
+      });
+    }
+    
+    // Render Failed Table
+    const failTbody = document.getElementById('failTable');
+    failTbody.innerHTML = '';
+    if (fail.length === 0) {
+      failTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-dim); padding:16px;">Tidak ada akun yang gagal.</td></tr>';
+    } else {
+      fail.forEach((item, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td style="font-weight:600; color:var(--text);">${escapeHtml(item.email)}</td>
+          <td style="color:var(--danger); font-size:11px;">${escapeHtml(item.reason || 'Gagal Impor')}</td>
+          <td>
+            <button class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:11px;" onclick="requeueAccount('${escapeHtml(item.email)}')">Ulangi</button>
+          </td>
+        `;
+        failTbody.appendChild(tr);
+      });
+    }
+  } catch (err) {
+    console.error('Error loading processed accounts:', err);
+  }
+}
+
+async function requeueAccount(email) {
+  try {
+    const r = await fetch('/api/processed_accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'requeue', email })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      alert(j.message);
+      loadConfig();
+      loadProcessedAccounts();
+    } else {
+      alert(j.error || 'Gagal memasukkan kembali ke antrean');
+    }
+  } catch (err) {
+    alert('Error koneksi server');
   }
 }
 
@@ -951,7 +1089,7 @@ function renderTable() {
   const wrap = document.getElementById('accTableWrap');
   
   document.getElementById('statAccounts').textContent = accs.length;
-  document.getElementById('accInfo').textContent = '(' + accs.length + ' Akun)';
+  document.getElementById('accInfo').textContent = '(' + accs.length + ' Akun Belum Diproses)';
   
   tbody.innerHTML = '';
   
@@ -1015,7 +1153,7 @@ function addAccount() {
   document.getElementById('new_email').value = '';
   document.getElementById('new_pass').value = '';
   
-  showToast(msg, '✓ Ditambahkan');
+  showToast(msg, '✓ Ditambahkan ke Antrean');
   saveAccounts();
 }
 
@@ -1107,7 +1245,6 @@ async function pollLogs() {
     
     setBadge(j.running, j.pid);
     
-    document.getElementById('statUrls').textContent = j.urls_count || 0;
     document.getElementById('log').textContent = (j.logs || []).join('\n');
     document.getElementById('urls').value = (j.urls_tail || []).join('\n');
     
