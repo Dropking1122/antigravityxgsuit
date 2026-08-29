@@ -200,6 +200,26 @@ def verify_account_imported(page, email: str) -> bool:
         return False
 
 
+def log_url(url: str):
+    """Simpan URL ke file log logs/urls.txt (1 baris per URL). Aman dari duplikat berurutan."""
+    if not url:
+        return
+    try:
+        os.makedirs(os.path.dirname(URL_LOG_FILE), exist_ok=True)
+        if os.path.exists(URL_LOG_FILE):
+            with open(URL_LOG_FILE, "r", encoding="utf-8") as f:
+                lines = f.read().splitlines()
+            if lines and lines[-1] == url:
+                return
+    except Exception:
+        pass
+    try:
+        with open(URL_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(url + "\n")
+    except Exception as e:
+        print(f"[!] Gagal tulis log URL ke {URL_LOG_FILE}: {e}")
+
+
 def _rewrite_redirect(route):
     """Bila browser mencoba melakukan navigasi ke localhost, cegah koneksi langsung
     dan alihkan (redirect) langsung ke IP host server."""
@@ -214,6 +234,8 @@ def _rewrite_redirect(route):
         is_real_callback = ("/callback?" in url and "code=" in url) or ("/callback" in url and "code=" in url and "state=" in url)
         if is_real_callback:
             LAST_REWRITE["url"] = new_url
+            log_url(url)
+            log_url(new_url)
             print(f"[*] [Get URL] Callback OAuth Localhost terdeteksi")
             print(f"[*] [Rewrite URL] Berhasil mengubah target dari Localhost -> Server IP: {new_netloc}")
             print(f"[*] [Hit URL] Menghubungkan ke callback server IP...")
