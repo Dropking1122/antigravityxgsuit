@@ -9,26 +9,97 @@ Otomasi `flow.py` untuk login dashboard 9Router (`<IP>:<PORT>`) → `/dashboard/
 - `RESTART_BROWSER_PER_ACCOUNT=true` close & buka browser baru tiap akun (solusi VPS).
 - Auto fixed `LAST_REWRITE` hanya untuk `/callback?code=` (tidak tertimpa static `woff2/css`).
 
-## Quick Start
+## Langkah-Langkah Install dan Cara Penggunaan
 
-### Windows
-```bat
-install.bat
-# edit .env dan accounts.txt
-.venv\Scripts\activate
-python flow.py
+### Prasyarat
+- Git, Python 3.10+ (`python --version`), pip
+- Ubuntu: `sudo apt update` ; Windows: install Python dari python.org (centang Add to PATH)
+
+### 1. Clone Repo
+```bash
+git clone https://github.com/Dropking1122/testantigravity.git
+cd testantigravity
 ```
 
-### Ubuntu VPS
+### 2. Install (otomatis)
+**Windows** `install.bat:1`
+```bat
+install.bat
+:: buat .venv, pip install -r requirements.txt:1 (playwright==1.62.0 + Flask==3.0.3), playwright install chromium
+```
+
+**Ubuntu VPS** `install.sh:1`
 ```bash
 chmod +x install.sh
 ./install.sh
-nano .env          # isi DASH_PASSWORD, HEADLESS=true, IP:PORT
-nano accounts.txt  # gmail|password per baris
+# apt install python3-venv xvfb, buat .venv, pip install -r requirements.txt, playwright install --with-deps chromium
+# otomatis buat .env & accounts.txt dari .env.example/accounts.txt.example jika belum ada
+```
+Manual tanpa script:
+```bash
+python3 -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+playwright install --with-deps chromium  # Ubuntu
+playwright install chromium              # Windows
+cp .env.example .env
+cp accounts.txt.example accounts.txt
+```
+
+### 3. Konfigurasi
+**Via UI (disarankan)** `app.py:1` `templates/index.html:1`
+```bash
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python app.py
+# buka http://localhost:5000 (VPS: http://<VPS_IP>:5000, buka port: sudo ufw allow 5000)
+```
+- **Config IP:PORT** `app.py:40` → isi **IP Server** + **Port** → auto rakit `REDIRECT_TO`, `LOGIN_URL=http://<IP>:<PORT>/login`, `TARGET_URL=.../antigravity` → **💾 Simpan .env** (`POST /api/config` tulis `.env:1`)
+- **DASH_PASSWORD / HEADLESS / RESET_PROFILE / CLEAR_EACH / RESTART_BROWSER_PER_ACCOUNT** di panel sama → Simpan
+- **Tambah Akun** `templates/index.html:80` → isi **Email** + **Password** → **➕ Tambah ke Daftar** (tabel preview, hapus per baris, sync Tabel↔Textarea) → auto `POST /api/accounts` simpan `accounts.txt:1`
+
+**Manual:**
+```bash
+nano .env          # isi DASH_PASSWORD, HEADLESS=false (visible) / true (VPS)
+nano accounts.txt  # per baris: gmail|password  (# komentar diabaikan)
+```
+
+### 4. Jalankan
+**Via UI:** tombol **▶ Start** (`POST /api/start` → `subprocess.Popen` `flow.py`), log real-time `GET /api/logs` poll 1.5s, **■ Stop** untuk terminate, **🧹 Clear Log**
+
+**Via CLI:**
+```bash
 source .venv/bin/activate
-python flow.py
-# atau headless virtual display:
+python flow.py                    # pakai .env
+HEADLESS=true python flow.py      # override
+# Windows visible
+.\.venv\Scripts\python.exe flow.py
+# VPS headless virtual display
 xvfb-run -a python flow.py
+# background VPS
+tmux new -s antig && python app.py
+# atau: nohup python app.py & / FLASK_HOST=0.0.0.0 FLASK_PORT=5000 python app.py
+```
+
+Alur `flow.py:179` : login → `Add` → `I Understand, Continue` → popup Google isi email/pass → auto-klik `Sign in`/`Login`/`Continue`/`Allow` → rewrite `localhost` → `REDIRECT_TO` (`flow.py:138`) → tunggu callback → `urls.txt`.
+
+### 5. Lihat Log
+- UI: panel **Log** + `urls.txt` textarea, file `flow.log:1` & `urls.txt:1`
+- CLI: stdout + `cat urls.txt` / `cat flow.log`
+
+### Quick Start (singkat)
+**Windows**
+```bat
+install.bat
+# edit .env & accounts.txt via UI atau nano
+.venv\Scripts\activate
+python app.py  # UI di http://localhost:5000
+```
+
+**Ubuntu VPS**
+```bash
+chmod +x install.sh && ./install.sh
+nano .env && nano accounts.txt
+source .venv/bin/activate && python app.py
+# atau langsung: python flow.py
 ```
 
 ## Konfigurasi `.env`
