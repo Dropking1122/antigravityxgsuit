@@ -22,9 +22,9 @@ except ImportError:
 from playwright.sync_api import sync_playwright
 
 # ---- Konfigurasi ----
-LOGIN_URL = "http://38.47.85.35:20128/login"
-TARGET_URL = "http://38.47.85.35:20128/dashboard/providers/antigravity"
-PASSWORD = os.getenv("DASH_PASSWORD", "Masuk123321")
+LOGIN_URL = os.getenv("LOGIN_URL", "http://localhost:20128/login")
+TARGET_URL = os.getenv("TARGET_URL", "http://localhost:20128/dashboard/providers/antigravity")
+PASSWORD = os.getenv("DASH_PASSWORD", "")
 PROFILE = os.getenv("USER_DATA_DIR", "./browser_profile")
 HEADLESS = os.getenv("HEADLESS", "false").lower() == "true"
 ACCOUNTS_FILE = os.getenv("ACCOUNTS_FILE", "accounts.txt")
@@ -128,47 +128,30 @@ def log_url(url: str):
 
 
 def _rewrite_redirect(route):
-    """Rewrite HANYA request yang host-nya memang localhost:20xxx -> IP server.
-    Dilakukan di level request agar browser tidak sempat konek ke localhost
-    (yang bikin tab blank / connection refused).
-
-    PENTING: dicek lewat urlparse().hostname == 'localhost', BUKAN substring
-    'localhost' di URL. Soalnya URL Google (CheckCookie dll) membawa query param
-    'redirect_uri=http://localhost:20128/callback' -> kalau cek substring, malah
-    host Google ikut terganti dan rusak (jadi 38.47.85.35 tanpa port)."""
+    """Bila browser mencoba melakukan navigasi ke localhost, cegah koneksi langsung
+    dan alihkan (redirect) langsung ke IP host server."""
     url = route.request.url
     from urllib.parse import urlparse, urlunparse
     parsed = urlparse(url)
     if parsed.hostname == "localhost":
-        # Host IP dari REDIRECT_TO, TAPI pertahankan port asli localhost
-        # (localhost:20128 -> 38.47.85.35:20128, dst)
         ip_host = REDIRECT_TO.split("://", 1)[-1].split(":", 1)[0]
         port = f":{parsed.port}" if parsed.port else ""
         new_netloc = ip_host + port
         new_url = urlunparse(parsed._replace(netloc=new_netloc))
-        # HANYA simpan LAST_REWRITE untuk callback ASLI (biar tidak tertimpa file static /_next/static/.../callback/...)
-        # callback asli: /callback?state=...&code=...  (ada ? dan code)
         is_real_callback = ("/callback?" in url and "code=" in url) or ("/callback" in url and "code=" in url and "state=" in url)
         if is_real_callback:
             LAST_REWRITE["url"] = new_url
-            log_url(url)  # catat URL asli callback (localhost)
-            log_url(new_url)  # catat juga versi IP agar urls.txt berisi IP:port
-            print(f"[*] Route rewrite CALLBACK: {url} -> {new_url}")
-        else:
-            # file static localhost (/_next/static/..., /app/callback/page-*.js) tetap rewrite tapi tidak simpan sebagai LAST_REWRITE
-            # jangan spam log untuk static - hanya print debug singkat
-            if "/callback" in url:
-                print(f"[*] Route rewrite static-callback: {url} -> {new_url}")
-            else:
-                print(f"[*] Route rewrite static: {url} -> {new_url}")
+            log_url(url)
+            log_url(new_url)
+            print(f"[*] Callback localhost terdeteksi ({url}) -> langsung redirect ke IP ({new_url})")
+            route.fulfill(status=302, headers={"Location": new_url})
+            return
         route.continue_(url=new_url)
     else:
-        # Request biasa (Google dkk) jalan normal. Hanya log jika callback IP (hindari spam log static)
         try:
             ip_host_dyn = REDIRECT_TO.split("://", 1)[-1].split(":", 1)[0]
         except Exception:
             ip_host_dyn = "38.47.85.35"
-        # hanya log kalau URL mengandung callback atau code/state biar urls.txt tidak penuh static
         if ("/callback" in url or "code=" in url) and (ip_host_dyn in url or "38.47.85.35" in url or "43.133.41.179" in url):
             log_url(url)
         route.continue_()
@@ -201,9 +184,14 @@ def run():
         reset_profile()
 
     with sync_playwright() as p:
+        args = [
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+        ]
         context = p.chromium.launch_persistent_context(
-            PROFILE, headless=HEADLESS,
-            args=["--disable-blink-features=AutomationControlled"])
+            PROFILE, headless=HEADLESS, args=args)
         page = context.new_page()
 
         # 1. Login dashboard (sekali saja)
@@ -247,16 +235,11 @@ def run():
             # atau restart browser per akun jika RESTART_BROWSER_PER_ACCOUNT=true
             if idx > 1:
                 if RESTART_BROWSER_PER_ACCOUNT:
-                    print(f"[*] Restart browser per akun (fresh) sebelum akun {idx}...")
-                    try:
-                        context.close()
-                    except Exception:
-                        pass
-                    # hapus cache Google juga
+                    print(f"[*] Membuat context/browser baru sebelum akun {idx}...")
                     for sub in ("Cache", "Code Cache", "GPUCache"):
-                        p = os.path.join(PROFILE, sub)
-                        if os.path.isdir(p):
-                            shutil.rmtree(p, ignore_errors=True)
+                        cache_path = os.path.join(PROFILE, sub)
+                        if os.path.isdir(cache_path):
+                            shutil.rmtree(cache_path, ignore_errors=True)
                     context = p.chromium.launch_persistent_context(
                         PROFILE, headless=HEADLESS,
                         args=["--disable-blink-features=AutomationControlled"])
@@ -591,59 +574,25 @@ def run():
                 time.sleep(1)
 
             if LAST_REWRITE["url"]:
-                print(f"[*] Callback IP: {LAST_REWRITE['url']}")
-                # tunggu popup selesai load halaman IP (networkidle) - jangan close prematur
-                try:
-                    if not popup.is_closed():
-                        print("[*] Tunggu popup load IP callback (networkidle 15s)...")
-                        popup.wait_for_load_state("networkidle", timeout=15000)
-                        print("[*] Popup networkidle")
-                except Exception as e:
-                    print(f"[*] wait networkidle popup: {e}")
-                # beri waktu tambahan 5 detik agar server proses token
-                print("[*] Tunggu 5 detik agar server proses callback...")
+                print(f"[*] Callback IP berhasil diproses: {LAST_REWRITE['url']}")
+                print("[*] Tunggu 5 detik agar server 9Router menyelesaikan impor akun...")
                 time.sleep(5)
-                # cek juga main page - kadang perlu reload atau tunggu dashboard update
                 try:
-                    if not popup.is_closed():
-                        print(f"[*] Popup masih terbuka, URL: {popup.url}")
-                    # pastikan main page juga menunggu networkidle jika ada rewrite
-                    try:
-                        page.wait_for_load_state("networkidle", timeout=5000)
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-                # re-hit callback di main page untuk memastikan proses selesai (jika belum)
-                try:
-                    print(f"[*] Re-hit callback di main page untuk konfirmasi: {LAST_REWRITE['url']}")
-                    page.goto(LAST_REWRITE["url"], wait_until="domcontentloaded", timeout=15000)
-                    page.wait_for_load_state("networkidle", timeout=10000)
-                    time.sleep(2)
-                    print("[*] Re-hit callback selesai, cek dashboard...")
-                    # kembali ke provider page untuk cek sukses
+                    print("[*] Navigasi ke halaman provider dashboard untuk mengecek status...")
                     page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=10000)
-                    time.sleep(2)
+                    time.sleep(3)
                 except Exception as e:
-                    print(f"[!] Re-hit / goto dashboard gagal: {e}")
-                # sekarang baru tunggu popup close, beri waktu 30 detik, jika tidak close jangan paksa tutup dulu
+                    print(f"[!] Goto dashboard provider gagal: {e}")
+                # Menunggu tab close sendiri atau beri waktu tambahan
                 try:
                     if not popup.is_closed():
-                        print("[*] Menunggu popup close (30s)...")
+                        print("[*] Menunggu tab ditutup secara otomatis oleh sistem (30 detik max)...")
                         popup.wait_for_event("close", timeout=30000)
-                        print("[*] Tab ditutup (callback OAuth selesai).")
+                        print("[*] Tab ditutup otomatis.")
                     else:
-                        print("[*] Popup sudah tertutup (callback selesai).")
+                        print("[*] Tab sudah ditutup secara otomatis.")
                 except Exception:
-                    print("[*] Popup tidak close dalam 30s, biarkan dulu, tidak paksa close")
-                    # jangan paksa close - biarkan 5 detik lagi lalu tutup halus jika masih ada
-                    time.sleep(5)
-                    try:
-                        if not popup.is_closed():
-                            print("[*] Tutup popup halus setelah delay")
-                            popup.close()
-                    except Exception:
-                        pass
+                    print("[*] Tab tidak ditutup otomatis, biarkan tetap terbuka tanpa dipaksa close.")
             else:
                 print("[!] Callback tidak terdeteksi dalam 60 dtk (LAST_REWRITE kosong)")
                 print(f"[*] URL popup terakhir: {popup.url if not popup.is_closed() else 'closed'}")
@@ -658,6 +607,13 @@ def run():
                             popup.close()
                     except Exception:
                         pass
+
+            if RESTART_BROWSER_PER_ACCOUNT:
+                print(f"[*] Tutup browser/context setelah selesai akun {idx}...")
+                try:
+                    context.close()
+                except Exception:
+                    pass
 
             time.sleep(2)
 

@@ -5,54 +5,60 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Antigravity Auto - UI</title>
   <style>
-    :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--accent:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--text:#e2e8f0;--muted:#94a3b8}
-    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-    header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px}
-    header h1{margin:0;font-size:18px} header small{color:var(--muted)}
-    .badge{padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
-    .badge-run{background:var(--ok);color:#052e16} .badge-stop{background:var(--border);color:var(--muted)}
-    .wrap{max-width:1200px;margin:0 auto;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    @media(max-width:900px){.wrap{grid-template-columns:1fr}}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
-    .card h2{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-    label{font-size:12px;color:var(--muted);display:block;margin:8px 0 4px}
-    input,select,textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:#0b1222;color:var(--text);font-size:13px}
-    textarea{font-family:ui-monospace,Consolas,monospace;resize:vertical}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-    .btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:#0b1222;color:var(--text);cursor:pointer;font-weight:600;font-size:13px}
-    .btn:hover{border-color:var(--accent)} .btn-primary{background:var(--accent);color:#082f49;border-color:var(--accent)} .btn-danger{background:var(--err);border-color:var(--err);color:white}
-    .btn:disabled{opacity:.5;cursor:not-allowed}
-    .log{height:380px;overflow:auto;background:#020617;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    small{color:var(--muted)} .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .kpi{font-size:12px;color:var(--muted)} .kpi b{color:var(--text)}
-    hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+    :root{--bg:#090d15;--surface:#101722;--surface-2:#151e2b;--field:#0b111b;--border:#263244;--border-strong:#3a4a60;--accent:#4f8cff;--accent-hover:#6a9dff;--ok:#32c787;--err:#ef5b67;--text:#edf2f7;--muted:#8e9bad;--shadow:0 16px 36px rgba(0,0,0,.24)}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(circle at top,#152037 0,#090d15 34rem);color:var(--text);font-size:14px;line-height:1.5}
+    header{position:sticky;top:0;z-index:10;padding:18px max(24px,calc((100vw - 1240px)/2));border-bottom:1px solid rgba(58,74,96,.7);background:rgba(9,13,21,.88);backdrop-filter:blur(16px);display:flex;justify-content:space-between;align-items:center;gap:20px}
+    header h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em} header h1 small{margin-left:6px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+    small{color:var(--muted)}
+    .badge{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:11px;font-weight:700;letter-spacing:.06em}
+    .badge:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+    .badge-run{color:var(--ok);background:rgba(50,199,135,.1);border-color:rgba(50,199,135,.3)} .badge-stop{color:var(--muted);background:var(--surface)}
+    .wrap{max-width:1240px;margin:0 auto;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+    .card{background:linear-gradient(180deg,rgba(21,30,43,.98),rgba(16,23,34,.98));border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+    .card h2{margin:0 0 18px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#c8d2df}
+    label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin:12px 0 6px}
+    input,select,textarea{width:100%;padding:10px 12px;border-radius:7px;border:1px solid var(--border);outline:none;background:var(--field);color:var(--text);font:inherit;transition:border-color .15s,box-shadow .15s}
+    input:hover,select:hover,textarea:hover{border-color:var(--border-strong)} input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,140,255,.14)} input[readonly],textarea[readonly]{background:#0a1019;color:#aab7c6}
+    input[type="checkbox"]{width:16px;height:16px;margin:0;accent-color:var(--accent);vertical-align:-3px}
+    textarea{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;resize:vertical;line-height:1.55}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .row3 label,.card>label:has(input[type="checkbox"]){display:flex;align-items:center;gap:8px;padding:10px 11px;margin:12px 0 0;border:1px solid var(--border);border-radius:7px;background:rgba(11,17,27,.6);color:#b8c3d1}
+    .btn{min-height:36px;padding:8px 14px;border-radius:7px;border:1px solid var(--border-strong);background:#172131;color:var(--text);cursor:pointer;font-weight:650;font-size:12px;letter-spacing:.01em;transition:background .15s,border-color .15s,transform .15s}
+    .btn:hover{background:#202c3e;border-color:#53657d}.btn:active{transform:translateY(1px)}.btn-primary{background:var(--accent);color:white;border-color:var(--accent)}.btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}.btn-danger{background:rgba(239,91,103,.12);border-color:rgba(239,91,103,.45);color:#ff8a94}.btn-danger:hover{background:rgba(239,91,103,.2);border-color:var(--err)}.btn:disabled{opacity:.42;cursor:not-allowed;transform:none}
+    .log{height:400px;overflow:auto;background:#060a10;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-all;color:#b9c8d8}
+    .flex{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.kpi{font-size:12px;color:var(--muted)}.kpi b{color:#dbe4ee;font-weight:650}hr{border:none;border-top:1px solid var(--border);margin:18px 0}
+    details{margin-top:16px;border:1px solid var(--border);border-radius:8px;background:rgba(11,17,27,.45)}summary{padding:11px 12px;cursor:pointer;color:#b8c3d1;font-size:12px;font-weight:650}details[open]{padding:0 12px 12px}details[open] summary{margin:0 -12px 8px;border-bottom:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse}th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}td,th{padding:9px 10px!important;text-align:left}tbody tr{border-top:1px solid var(--border)!important}tbody tr:hover{background:rgba(79,140,255,.04)}
+    code{padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--field);color:#c8d6e5}
+    #cfgMsg,#accMsg,#addMsg{font-weight:650;color:#a9bdd3}
+    @media(max-width:900px){header{position:static;padding:16px 18px;align-items:flex-start;flex-direction:column}.wrap{grid-template-columns:1fr;padding:16px}.row3{grid-template-columns:1fr}.card{padding:17px}}
+    @media(max-width:600px){.row,.grid2{grid-template-columns:1fr}.flex .btn{flex:1}.log{height:320px}}
   </style>
 </head>
 <body>
 <header>
   <div>
     <h1>Antigravity Auto <small>9Router</small></h1>
-    <div class="kpi">IP:PORT tersimpan di <b>.env</b> → <span id="ipport">-</span> • <span id="accCount">0 akun</span> • <span id="urlsCount">0 urls</span></div>
+    <div class="kpi">Server <b id="ipport">-</b> &nbsp;/&nbsp; <span id="accCount">0 akun</span> &nbsp;/&nbsp; <span id="urlsCount">0 URL</span></div>
   </div>
   <div class="flex">
     <span id="statusBadge" class="badge badge-stop">STOPPED</span>
-    <button class="btn btn-primary" id="btnStart" onclick="doStart()">▶ Start</button>
-    <button class="btn btn-danger" id="btnStop" onclick="doStop()" disabled>■ Stop</button>
+    <button class="btn btn-primary" id="btnStart" onclick="doStart()">Jalankan</button>
+    <button class="btn btn-danger" id="btnStop" onclick="doStop()" disabled>Hentikan</button>
   </div>
 </header>
 
 <div class="wrap">
   <!-- CONFIG IP:PORT -->
   <div class="card">
-    <h2>Konfigurasi IP:PORT (.env)</h2>
+    <h2>Konfigurasi Server</h2>
     <div class="row">
       <div><label>IP Server</label><input id="cfg_ip" placeholder="YOUR_IP"/></div>
       <div><label>Port</label><input id="cfg_port" placeholder="PORT"/></div>
     </div>
     <label>Pratinjau</label>
-    <input id="preview_url" readonly style="background:#082f49"/>
+    <input id="preview_url" readonly/>
     <div class="row">
       <div><label>DASH_PASSWORD</label><input id="cfg_pass" type="password" placeholder="YOUR_DASH_PASSWORD"/></div>
       <div><label>FLASK_PORT (UI)</label><input id="cfg_flaskport" placeholder="5000"/></div>
@@ -63,15 +69,15 @@
       <label><input type="checkbox" id="cfg_clear"/> CLEAR_EACH</label>
     </div>
     <label><input type="checkbox" id="cfg_restart"/> RESTART_BROWSER_PER_ACCOUNT (close tiap akun)</label>
-    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted)">Advanced (LOGIN_URL / TARGET_URL / REDIRECT)</summary>
+    <details><summary>Konfigurasi lanjutan</summary>
       <label>LOGIN_URL</label><input id="cfg_login"/>
       <label>TARGET_URL</label><input id="cfg_target"/>
       <label>REDIRECT_FROM</label><input id="cfg_from"/>
       <label>REDIRECT_TO</label><input id="cfg_to"/>
     </details>
     <div class="flex" style="margin-top:12px">
-      <button class="btn btn-primary" onclick="saveConfig()">💾 Simpan .env</button>
-      <button class="btn" onclick="loadConfig()">↻ Reload</button>
+      <button class="btn btn-primary" onclick="saveConfig()">Simpan Konfigurasi</button>
+      <button class="btn" onclick="loadConfig()">Muat Ulang</button>
       <small id="cfgMsg"></small>
     </div>
     <small>IP:PORT otomatis rakit jadi <b>REDIRECT_TO</b>, <b>LOGIN_URL</b>, <b>TARGET_URL</b> saat simpan.</small>
@@ -79,16 +85,16 @@
 
   <!-- ACCOUNTS -->
   <div class="card">
-    <h2>Accounts.txt <small id="accInfo"></small></h2>
-    <div style="background:#0b1222;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
-      <label style="margin:0 0 8px;font-weight:600;color:var(--text)">Tambah Akun (mudah)</label>
+    <h2>Manajemen Akun <small id="accInfo"></small></h2>
+    <div style="background:rgba(11,17,27,.55);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px">
+      <label style="margin:0 0 10px;font-weight:700;color:var(--text)">Tambah Akun</label>
       <div class="row">
         <div><label>Email (gmail)</label><input id="new_email" placeholder="your@gmail.com" type="email"/></div>
-        <div><label>Password</label><input id="new_pass" placeholder="your_password" type="text"/></div>
+        <div><label>Password</label><input id="new_pass" placeholder="your_password" type="password"/></div>
       </div>
       <div class="flex" style="margin-top:8px">
-        <button class="btn btn-primary" onclick="addAccount()">➕ Tambah ke Daftar</button>
-        <button class="btn" onclick="document.getElementById('new_email').value='';document.getElementById('new_pass').value='';">✖ Clear</button>
+        <button class="btn btn-primary" onclick="addAccount()">Tambah Akun</button>
+        <button class="btn" onclick="document.getElementById('new_email').value='';document.getElementById('new_pass').value='';">Bersihkan Form</button>
         <small id="addMsg"></small>
       </div>
       <div id="accTableWrap" style="margin-top:12px;max-height:160px;overflow:auto;border:1px solid var(--border);border-radius:8px;display:none">
@@ -98,15 +104,15 @@
         </table>
       </div>
       <div class="flex" style="margin-top:8px">
-        <button class="btn" onclick="syncTableToTextarea()">⬇ Sync Tabel → Textarea</button>
-        <button class="btn" onclick="syncTextareaToTable()">⬆ Sync Textarea → Tabel</button>
-        <button class="btn" onclick="if(confirm('Hapus semua akun?')){document.getElementById('accounts').value='';saveAccounts();renderTable();}">🗑 Hapus Semua</button>
+        <button class="btn" onclick="syncTableToTextarea()">Tabel ke Editor</button>
+        <button class="btn" onclick="syncTextareaToTable()">Editor ke Tabel</button>
+        <button class="btn btn-danger" onclick="if(confirm('Hapus semua akun?')){document.getElementById('accounts').value='';saveAccounts();renderTable();}">Hapus Semua</button>
       </div>
     </div>
     <label>Advanced: Edit langsung <code>gmail|password</code> per baris (# komentar diabaikan)</label>
     <textarea id="accounts" rows="6" placeholder="your@gmail.com|your_password&#10;another@gmail.com|pass2"></textarea>
     <div class="flex" style="margin-top:8px">
-      <button class="btn btn-primary" onclick="saveAccounts()">💾 Simpan accounts.txt</button>
+      <button class="btn btn-primary" onclick="saveAccounts()">Simpan Daftar Akun</button>
       <small id="accMsg"></small>
     </div>
     <hr/>
@@ -117,8 +123,8 @@
         <div class="kpi">Status: <b id="runStatus">-</b> • PID: <b id="pid">-</b></div>
         <div class="kpi">Log lines: <b id="logCount">0</b></div>
         <div style="margin-top:8px" class="flex">
-          <button class="btn" onclick="clearLogs()">🧹 Clear Log</button>
-          <button class="btn" onclick="pollLogs()">↻ Refresh</button>
+          <button class="btn" onclick="clearLogs()">Bersihkan Log</button>
+          <button class="btn" onclick="pollLogs()">Muat Ulang</button>
         </div>
       </div>
     </div>
@@ -127,7 +133,7 @@
   <!-- LOG -->
   <div class="card" style="grid-column:1/-1">
     <div class="flex" style="justify-content:space-between">
-      <h2>Log (flow.py + rewrite)</h2>
+      <h2>Aktivitas Proses</h2>
       <label style="margin:0"><input type="checkbox" id="autoScroll" checked/> auto-scroll</label>
     </div>
     <div id="log" class="log">Menunggu...</div>
@@ -191,7 +197,7 @@ function updatePreview(){
 function parseAccounts(){
   const txt=document.getElementById('accounts').value;
   return txt.split('\n').map(l=>l.trim()).filter(l=>l&&!l.startsWith('#')).map(l=>{
-    const p=l.split('|'); return {email:(p[0]||'').trim(), pass:(p[1]||'').trim(), raw:l}
+    const i=l.indexOf('|'); return {email:(i<0?l:l.slice(0,i)).trim(), pass:(i<0?'':l.slice(i+1)).trim(), raw:l}
   }).filter(x=>x.email);
 }
 function renderTable(){
@@ -204,7 +210,8 @@ function renderTable(){
   accs.forEach((a,i)=>{
     const tr=document.createElement('tr');
     tr.style.borderTop='1px solid var(--border)';
-    tr.innerHTML=`<td style="padding:6px">${i+1}</td><td style="padding:6px;word-break:break-all">${a.email}</td><td style="padding:6px;font-family:monospace">••••••</td><td style="padding:6px"><button class="btn" style="padding:4px 8px;font-size:11px" onclick="deleteAccount(${i})">✖</button></td>`;
+    tr.innerHTML=`<td style="padding:6px">${i+1}</td><td style="padding:6px;word-break:break-all"></td><td style="padding:6px;font-family:monospace">••••••</td><td style="padding:6px"><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteAccount(${i})">Hapus</button></td>`;
+    tr.children[1].textContent=a.email;
     tbody.appendChild(tr);
   });
 }
@@ -227,7 +234,7 @@ function addAccount(){
   if(cur.split('\n').some(l=>l.trim()===line)){ msg.textContent='sudah ada'; setTimeout(()=>msg.textContent='',2000); return; }
   document.getElementById('accounts').value = cur ? cur+'\n'+line : line;
   document.getElementById('new_email').value=''; document.getElementById('new_pass').value='';
-  msg.textContent='✓ ditambah (belum disimpan)'; setTimeout(()=>msg.textContent='',2000);
+  msg.textContent='Berhasil ditambahkan'; setTimeout(()=>msg.textContent='',2000);
   renderTable();
   // auto save
   saveAccounts();
@@ -258,7 +265,7 @@ async function saveConfig(){
   };
   const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const j=await r.json();
-  document.getElementById('cfgMsg').textContent = j.ok ? '✓ tersimpan' : '✗ '+(j.error||'gagal');
+  document.getElementById('cfgMsg').textContent = j.ok ? 'Berhasil disimpan' : (j.error||'Gagal menyimpan');
   setTimeout(()=>document.getElementById('cfgMsg').textContent='',2000);
   loadConfig();
 }
@@ -266,7 +273,7 @@ async function saveAccounts(){
   const content=document.getElementById('accounts').value;
   const r=await fetch('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});
   const j=await r.json();
-  document.getElementById('accMsg').textContent=j.ok?`✓ ${j.lines} akun`:'✗ gagal';
+  document.getElementById('accMsg').textContent=j.ok?`Tersimpan ${j.lines} akun`:'Gagal menyimpan';
   setTimeout(()=>document.getElementById('accMsg').textContent='',2000);
   loadConfig();
 }

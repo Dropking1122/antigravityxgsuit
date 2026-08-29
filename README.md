@@ -52,9 +52,9 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 python app.py
 # buka http://localhost:5000 (VPS: http://<VPS_IP>:5000, buka port: sudo ufw allow 5000)
 ```
-- **Config IP:PORT** `app.py:40` → isi **IP Server** + **Port** → auto rakit `REDIRECT_TO`, `LOGIN_URL=http://<IP>:<PORT>/login`, `TARGET_URL=.../antigravity` → **💾 Simpan .env** (`POST /api/config` tulis `.env:1`)
+- **Config IP:PORT** `app.py:40` → isi **IP Server** + **Port** → auto rakit `REDIRECT_TO`, `LOGIN_URL=http://<IP>:<PORT>/login`, `TARGET_URL=.../antigravity` → **Simpan Konfigurasi** (`POST /api/config` tulis `.env:1`)
 - **DASH_PASSWORD / HEADLESS / RESET_PROFILE / CLEAR_EACH / RESTART_BROWSER_PER_ACCOUNT** di panel sama → Simpan
-- **Tambah Akun** `templates/index.html:80` → isi **Email** + **Password** → **➕ Tambah ke Daftar** (tabel preview, hapus per baris, sync Tabel↔Textarea) → auto `POST /api/accounts` simpan `accounts.txt:1`
+- **Tambah Akun** `templates/index.html:84` → isi **Email** + **Password** → **Tambah Akun** (tabel preview, hapus per baris, sync Tabel↔Textarea) → auto `POST /api/accounts` simpan `accounts.txt:1`
 
 **Manual:**
 ```bash
@@ -63,7 +63,7 @@ nano accounts.txt  # per baris: gmail|password  (# komentar diabaikan)
 ```
 
 ### 4. Jalankan
-**Via UI:** tombol **▶ Start** (`POST /api/start` → `subprocess.Popen` `flow.py`), log real-time `GET /api/logs` poll 1.5s, **■ Stop** untuk terminate, **🧹 Clear Log**
+**Via UI:** tombol **Jalankan** (`POST /api/start` → `subprocess.Popen` `flow.py`), log real-time `GET /api/logs` poll 1.5s, **Hentikan** untuk terminate, **Bersihkan Log**
 
 **Via CLI:**
 ```bash
@@ -139,10 +139,10 @@ python app.py
 # buka http://localhost:5000  (atau http://<VPS_IP>:5000)
 ```
 Fitur UI:
-- **Config IP:PORT** — isi IP & Port, auto-rakit `REDIRECT_TO`/`LOGIN_URL`/`TARGET_URL`, simpan ke `.env` (tombol *Simpan .env*)
+- **Config IP:PORT** — isi IP & Port, auto-rakit `REDIRECT_TO`/`LOGIN_URL`/`TARGET_URL`, simpan ke `.env` (tombol *Simpan Konfigurasi*)
 - **Accounts** — edit `accounts.txt` langsung
 - **Start / Stop** — jalankan `flow.py` visible/headless sesuai `.env`, tampilkan log real-time + `urls.txt`
-- Log di `flow.log`, auto-scroll, `Clear Log`
+- Log aktivitas proses, auto-scroll, `Bersihkan Log`
 
 Untuk VPS Ubuntu buka port `5000`:
 ```bash
