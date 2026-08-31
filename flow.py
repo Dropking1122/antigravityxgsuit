@@ -29,9 +29,10 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---- Konfigurasi ----
-LOGIN_URL = os.getenv("LOGIN_URL", "http://38.47.85.35:20128/login")
-TARGET_URL = os.getenv("TARGET_URL", "http://38.47.85.35:20128/dashboard/providers/antigravity")
-PASSWORD = os.getenv("DASH_PASSWORD", "Masuk123321")
+ROUTER_HOST = os.getenv("ROUTER_HOST", "").rstrip("/")
+LOGIN_URL = os.getenv("LOGIN_URL", f"{ROUTER_HOST}/login" if ROUTER_HOST else "")
+TARGET_URL = os.getenv("TARGET_URL", f"{ROUTER_HOST}/dashboard/providers/antigravity" if ROUTER_HOST else "")
+PASSWORD = os.getenv("DASH_PASSWORD", "")
 PROFILE = os.getenv("USER_DATA_DIR", "./browser_profile")
 HEADLESS = os.getenv("HEADLESS", "true").lower() == "true"
 ACCOUNTS_FILE = os.getenv("ACCOUNTS_FILE", "accounts.txt")
@@ -44,7 +45,10 @@ CLEAR_EACH = os.getenv("CLEAR_EACH", "true").lower() == "true"
 
 # OAuth callback Google mengarah ke localhost, kita rewrite ke IP server
 REDIRECT_FROM = os.getenv("REDIRECT_FROM", "http://localhost:20128")
-REDIRECT_TO = os.getenv("REDIRECT_TO", "http://38.47.85.35:20128")
+REDIRECT_TO = os.getenv("REDIRECT_TO", ROUTER_HOST)
+
+if not LOGIN_URL or not TARGET_URL or not PASSWORD:
+    raise ValueError("[!] LOGIN_URL, TARGET_URL/ROUTER_HOST, dan DASH_PASSWORD wajib diisi di .env atau environment variables!")
 
 # File log semua URL & file riwayat akun
 URL_LOG_FILE = os.getenv("URL_LOG_FILE", "urls.txt")

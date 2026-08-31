@@ -87,7 +87,7 @@ def read_env_config():
         "TARGET_URL": "http://localhost:20128/dashboard/providers/antigravity",
         "DASH_PASSWORD": "",
         "REDIRECT_FROM": "http://localhost:20128",
-        "REDIRECT_TO": "http://38.47.85.35:20128",
+        "REDIRECT_TO": "http://localhost:20128",
         "HEADLESS": "true",
         "RESET_PROFILE": "false",
         "CLEAR_EACH": "true",
