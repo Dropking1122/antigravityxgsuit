@@ -48,8 +48,22 @@ REDIRECT_TO = os.getenv("REDIRECT_TO", "http://38.47.85.35:20128")
 
 # File log semua URL & file riwayat akun
 URL_LOG_FILE = os.getenv("URL_LOG_FILE", "urls.txt")
+FLOW_LOG_FILE = LOGS_DIR / "flow.log"
 PROCESSED_ACCOUNTS_FILE = DATA_DIR / "processed_accounts.txt"
 FAILED_ACCOUNTS_FILE = DATA_DIR / "failed_accounts.txt"
+
+# Hook print bawaan agar otomatis menulis ke logs/flow.log dan stdout sekaligus
+_builtin_print = print
+def print(*args, **kwargs):
+    _builtin_print(*args, **kwargs)
+    try:
+        msg = " ".join(str(a) for a in args)
+        with open(FLOW_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+        with open(BASE_DIR / "flow.log", "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except Exception:
+        pass
 
 # Menyimpan URL callback terakhir yang sudah di-rewrite ke IP
 # (dipakai untuk re-hit kalau tab keburu close)
@@ -99,8 +113,20 @@ def clear_google_sessions(context):
 
 
 def load_accounts(path: str):
-    """Baca file teks baris: gmail|password"""
+    """Baca file teks baris: gmail|password dengan deduplikasi & abaikan akun yang SUDAH SUKSES"""
     accounts = []
+    seen = set()
+
+    # Baca daftar email yang SUDAH SUKSES agar tidak diproses ulang
+    success_emails = set()
+    if PROCESSED_ACCOUNTS_FILE.exists():
+        try:
+            for l in PROCESSED_ACCOUNTS_FILE.read_text(encoding="utf-8").splitlines():
+                if l.strip() and "|" in l:
+                    success_emails.add(l.split("|")[0].strip().lower())
+        except Exception:
+            pass
+
     if not os.path.exists(path):
         if os.path.exists(os.path.join("data", path)):
             path = os.path.join("data", path)
@@ -114,8 +140,14 @@ def load_accounts(path: str):
                 continue
             if "|" in line:
                 email, pw = line.split("|", 1)
-                accounts.append((email.strip(), pw.strip()))
-    print(f"[*] Total akun dibaca: {len(accounts)}")
+                email_clean = email.strip()
+                # Lewati jika sudah pernah sukses atau duplikat
+                if email_clean.lower() in success_emails:
+                    continue
+                if email_clean.lower() not in seen and pw.strip():
+                    seen.add(email_clean.lower())
+                    accounts.append((email_clean, pw.strip()))
+    print(f"[*] Total akun valid siap diproses: {len(accounts)}")
     return accounts
 
 
@@ -126,7 +158,7 @@ def move_account(email: str, gpw: str, status: str, error_msg: str = ""):
     log_entry = f"{email}|{gpw}|{status}|{timestamp}"
     if error_msg:
         log_entry += f"|{error_msg}"
-    
+
     try:
         with open(target_file, "a", encoding="utf-8") as f:
             f.write(log_entry + "\n")
@@ -533,8 +565,7 @@ def run():
                         print(f"[*] Callback terdeteksi via rewrite")
                         break
                     try:
-                        cur_url = popup.url if not popup.is_closed() else ""
-                        if "callback" in cur_url:
+                        if popup.is_closed():
                             break
                     except Exception:
                         pass
@@ -547,10 +578,19 @@ def run():
                             'button:has-text("Login")',
                             'span.VfPpkd-vQzf8d:has-text("Login")',
                             'button:has-text("Sign in")',
+                            'button:has-text("I understand")',
+                            'button:has-text("Saya mengerti")',
+                            'button:has-text("Understand")',
+                            'button:has-text("Accept")',
+                            'button:has-text("Setuju")',
+                            'button:has-text("Agree")',
                             'button:has-text("Lanjutkan")',
                             'button:has-text("Izinkan")',
                             'button:has-text("Allow")',
                             'button:has-text("Continue")',
+                            '#submit_approve_access',
+                            '#confirm',
+                            'input[type="submit"]',
                         ]
                         for b_sel in login_candidates:
                             loc = popup.locator(b_sel)
@@ -559,6 +599,9 @@ def run():
                                 loc.first.click(timeout=3000)
                                 time.sleep(2)
                                 break
+                        # Scroll bawah jika ada speedbump termsofservice
+                        if "speedbump" in popup.url or "termsofservice" in popup.url:
+                            popup.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                     except Exception:
                         pass
                     # ==============================================================================
@@ -580,10 +623,6 @@ def run():
                     try:
                         if popup.is_closed():
                             break
-                        cur = popup.url
-                        if "callback" in cur:
-                            print(f"[*] Popup URL callback: {cur}")
-                            break
                     except Exception:
                         pass
                     time.sleep(1)
@@ -593,7 +632,7 @@ def run():
                     # Langsung catat sukses & pindahkan akun seketika tanpa menunggu timer selesai
                     move_account(email, gpw, "SUCCESS")
                     print(f"[✓] PROSES AKUN SUKSES: {email} -> langsung dicatat & dipindahkan.")
-                    
+                
                     try:
                         if not popup.is_closed():
                             popup.goto(LAST_REWRITE["url"], wait_until="domcontentloaded", timeout=15000)
