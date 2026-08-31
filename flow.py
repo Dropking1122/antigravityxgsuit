@@ -176,7 +176,6 @@ def move_account(email: str, gpw: str, status: str, error_msg: str = ""):
             try:
                 lines = acc_f.read_text(encoding="utf-8").splitlines()
                 new_lines = []
-                removed = False
                 for line in lines:
                     stripped = line.strip()
                     if not stripped or stripped.startswith("#"):
@@ -184,8 +183,7 @@ def move_account(email: str, gpw: str, status: str, error_msg: str = ""):
                         continue
                     if "|" in stripped:
                         em, _ = stripped.split("|", 1)
-                        if em.strip().lower() == email.strip().lower() and not removed:
-                            removed = True
+                        if em.strip().lower() == email.strip().lower():
                             continue
                     new_lines.append(line)
                 acc_f.write_text("\n".join(new_lines) + ("\n" if new_lines else ""), encoding="utf-8")

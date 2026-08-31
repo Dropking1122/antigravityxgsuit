@@ -484,6 +484,27 @@ def api_processed_accounts():
         action = data.get("action")
         email = data.get("email", "").strip()
         
+        if action == "requeue_all":
+            acc_path = resolve_accounts_file()
+            count = 0
+            if fail_file.exists():
+                lines = [l.strip() for l in fail_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+                requeue_items = []
+                for line in lines:
+                    parts = line.split("|")
+                    if len(parts) >= 2:
+                        requeue_items.append(f"{parts[0].strip()}|{parts[1].strip()}")
+                if requeue_items:
+                    current = acc_path.read_text(encoding="utf-8").splitlines() if acc_path.exists() else []
+                    merged = [l.strip() for l in current if l.strip()]
+                    for item in requeue_items:
+                        if item not in merged:
+                            merged.append(item)
+                    acc_path.write_text("\n".join(merged) + ("\n" if merged else ""), encoding="utf-8")
+                    fail_file.write_text("", encoding="utf-8")
+                    count = len(requeue_items)
+            return jsonify({"ok": True, "message": f"Berhasil mengembalikan {count} akun gagal ke antrean!"})
+
         if action == "requeue" and email:
             acc_path = resolve_accounts_file()
             new_failed_lines = []

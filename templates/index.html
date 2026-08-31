@@ -873,7 +873,10 @@
 
         <!-- FAILED TABLE -->
         <div class="form-group">
-          <label style="color:var(--danger)">[✗] Akun Gagal / Perlu Ulang (failed_accounts.txt)</label>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <label style="color:var(--danger); margin:0;">[✗] Akun Gagal / Perlu Ulang (failed_accounts.txt)</label>
+            <button class="btn btn-warning btn-sm" style="font-size:11px; padding:3px 10px;" onclick="requeueAllAccounts()"><i class="fas fa-sync-alt"></i> Ulangi Semua Akun Gagal</button>
+          </div>
           <div class="table-container" style="max-height: 380px;">
             <table>
               <thead>
@@ -1122,6 +1125,31 @@ async function requeueAccount(email) {
     } else {
       alert(j.error || 'Gagal memasukkan kembali ke antrean');
     }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function requeueAllAccounts() {
+  if (!confirm("Yakin ingin mengembalikan SEMUA akun gagal ke antrean?")) return;
+  try {
+    const r = await fetch('/api/processed_accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'requeue_all' })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      alert(j.message);
+      loadConfig();
+      loadProcessedAccounts();
+    } else {
+      alert(j.error || 'Gagal memasukkan kembali semua akun ke antrean');
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
   } catch (err) {
     alert('Error koneksi server');
   }

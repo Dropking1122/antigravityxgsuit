@@ -18,9 +18,7 @@ ENV_FILE = BASE_DIR / ".env"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
-ACCOUNTS_FILE = DATA_DIR / "accounts.txt"
-if not ACCOUNTS_FILE.exists() and (BASE_DIR / "accounts.txt").exists():
-    ACCOUNTS_FILE = BASE_DIR / "accounts.txt"
+ACCOUNTS_FILE = BASE_DIR / "accounts.txt"
 
 PROCESSED_FILE = DATA_DIR / "processed_accounts.txt"
 FAILED_FILE = DATA_DIR / "failed_accounts.txt"
