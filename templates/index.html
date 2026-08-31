@@ -1028,29 +1028,28 @@ async function loadConfig() {
     const j = await r.json();
     const c = j.config || {};
     
-    document.getElementById('cfg_ip').value = c._IP || '';
-    document.getElementById('cfg_port').value = c._PORT || '';
-    document.getElementById('cfg_pass').value = c.DASH_PASSWORD || '';
-    document.getElementById('cfg_flaskport').value = c.FLASK_PORT || '5000';
+    if (document.getElementById('cfg_ip')) document.getElementById('cfg_ip').value = c._IP || '';
+    if (document.getElementById('cfg_port')) document.getElementById('cfg_port').value = c._PORT || '';
+    if (document.getElementById('cfg_pass')) document.getElementById('cfg_pass').value = c.DASH_PASSWORD || '';
+    if (document.getElementById('cfg_flaskport')) document.getElementById('cfg_flaskport').value = c.FLASK_PORT || '5000';
     
-    document.getElementById('cfg_headless').checked = (c.HEADLESS || 'false') === 'true';
-    document.getElementById('cfg_reset').checked = (c.RESET_PROFILE || 'false') === 'true';
-    document.getElementById('cfg_clear').checked = (c.CLEAR_EACH || 'true') === 'true';
-    document.getElementById('cfg_restart').checked = (c.RESTART_BROWSER_PER_ACCOUNT || 'false') === 'true';
+    if (document.getElementById('cfg_headless')) document.getElementById('cfg_headless').checked = (c.HEADLESS || 'false') === 'true';
+    if (document.getElementById('cfg_reset')) document.getElementById('cfg_reset').checked = (c.RESET_PROFILE || 'false') === 'true';
+    if (document.getElementById('cfg_clear')) document.getElementById('cfg_clear').checked = (c.CLEAR_EACH || 'true') === 'true';
+    if (document.getElementById('cfg_restart')) document.getElementById('cfg_restart').checked = (c.RESTART_BROWSER_PER_ACCOUNT || 'false') === 'true';
     
-    document.getElementById('cfg_login').value = c.LOGIN_URL || '';
-    document.getElementById('cfg_target').value = c.TARGET_URL || '';
-    document.getElementById('cfg_from').value = c.REDIRECT_FROM || '';
-    document.getElementById('cfg_to').value = c.REDIRECT_TO || '';
-    document.getElementById('preview_url').value = c.REDIRECT_TO || '';
+    if (document.getElementById('cfg_login')) document.getElementById('cfg_login').value = c.LOGIN_URL || '';
+    if (document.getElementById('cfg_target')) document.getElementById('cfg_target').value = c.TARGET_URL || '';
+    if (document.getElementById('cfg_from')) document.getElementById('cfg_from').value = c.REDIRECT_FROM || '';
+    if (document.getElementById('cfg_to')) document.getElementById('cfg_to').value = c.REDIRECT_TO || '';
+    if (document.getElementById('preview_url')) document.getElementById('preview_url').value = c.REDIRECT_TO || '';
     
-    document.getElementById('statServer').textContent = c._IP_PORT || '-';
+    if (document.getElementById('statServer')) document.getElementById('statServer').textContent = c._IP_PORT || (c.REDIRECT_TO ? c.REDIRECT_TO.replace('http://', '') : '-');
     
-    document.getElementById('accounts').value = j.accounts || '';
-    document.getElementById('urls').value = j.urls || '';
+    if (j.accounts !== undefined && document.getElementById('accounts')) document.getElementById('accounts').value = j.accounts;
+    if (j.urls !== undefined && document.getElementById('urls')) document.getElementById('urls').value = j.urls;
     
     renderTable();
-    updatePreview();
     loadProcessedAccounts();
   } catch (err) {
     console.error('Failed to load config:', err);
@@ -1148,10 +1147,6 @@ async function requeueAllAccounts() {
     }
   } catch (err) {
     console.error(err);
-  }
-}
-  } catch (err) {
-    alert('Error koneksi server');
   }
 }
 
@@ -1362,8 +1357,8 @@ async function pollLogs() {
       }
     }
     if (j.accounts_count !== undefined) {
-      document.getElementById('accCount').textContent = j.accounts_count + ' Akun Tersedia';
-      document.getElementById('statAccounts').textContent = j.accounts_count;
+      if (document.getElementById('accCount')) document.getElementById('accCount').textContent = j.accounts_count + ' Akun Tersedia';
+      if (document.getElementById('statAccounts')) document.getElementById('statAccounts').textContent = j.accounts_count;
     }
     if (j.processed_count !== undefined) {
       document.getElementById('statSuccess').textContent = j.processed_count;

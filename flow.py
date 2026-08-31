@@ -62,6 +62,8 @@ def print(*args, **kwargs):
     _builtin_print(*args, **kwargs)
     try:
         msg = " ".join(str(a) for a in args)
+        if not kwargs.get("file"):
+            sys.stdout.flush()
         with open(FLOW_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(msg + "\n")
         with open(BASE_DIR / "flow.log", "a", encoding="utf-8") as f:

@@ -146,13 +146,18 @@ def write_env_config(updates: dict):
     return True
 
 def append_log(line: str):
+    clean_line = line.rstrip("\n")
     with log_lock:
-        log_lines.append(line.rstrip("\n"))
+        log_lines.append(clean_line)
         if len(log_lines) > MAX_LOG_LINES:
             del log_lines[: len(log_lines) - MAX_LOG_LINES]
     try:
         with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(line if line.endswith("\n") else line + "\n")
+            f.write(clean_line + "\n")
+            f.flush()
+        with open(ROOT_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(clean_line + "\n")
+            f.flush()
     except Exception:
         pass
 
@@ -169,17 +174,14 @@ def clear_log():
 
 def reader_thread(p):
     try:
-        for line in iter(p.stdout.readline, ""):
-            if not line:
-                break
-            append_log(line)
-        try:
-            remaining = p.stdout.read()
-            if remaining:
-                for l in remaining.splitlines():
-                    append_log(l + "\n")
-        except Exception:
-            pass
+        while True:
+            line = p.stdout.readline()
+            if line:
+                append_log(line)
+            else:
+                if p.poll() is not None:
+                    break
+                time.sleep(0.05)
     except Exception as e:
         append_log(f"[!] Reader error: {e}\n")
     finally:
@@ -280,18 +282,27 @@ def api_start():
         flow = BASE_DIR / "flow.py"
         if not flow.exists():
             return jsonify({"error": "File flow.py tidak ditemukan"}), 500
-        
+
         env = os.environ.copy()
         if ENV_FILE.exists() and dotenv_values:
             for k, v in dotenv_values(ENV_FILE).items():
                 if v is not None:
                     env[k] = str(v)
                     
-        for k in ["HEADLESS","RESET_PROFILE","CLEAR_EACH","RESTART_BROWSER_PER_ACCOUNT","ACCOUNTS_FILE","LOGIN_URL","TARGET_URL","REDIRECT_TO"]:
+        for k in ["HEADLESS","RESET_PROFILE","CLEAR_EACH","RESTART_BROWSER_PER_ACCOUNT","ACCOUNTS_FILE","LOGIN_URL","TARGET_URL","REDIRECT_TO","DASH_PASSWORD","ROUTER_HOST"]:
             if k in data and data[k] is not None:
                 env[k] = str(data[k])
                 
         env["PYTHONUNBUFFERED"] = "1"
+
+        login_url = env.get("LOGIN_URL") or (env.get("ROUTER_HOST", "").rstrip("/") + "/login" if env.get("ROUTER_HOST") else "")
+        target_url = env.get("TARGET_URL") or (env.get("ROUTER_HOST", "").rstrip("/") + "/dashboard/providers/antigravity" if env.get("ROUTER_HOST") else "")
+        dash_pass = env.get("DASH_PASSWORD")
+
+        if not login_url or not target_url or not dash_pass:
+            err_msg = "[!] Gagal Start: LOGIN_URL, TARGET_URL, dan DASH_PASSWORD wajib diisi di .env atau UI Konfigurasi Server!"
+            append_log(err_msg)
+            return jsonify({"error": err_msg}), 400
 
         if data.get("clear_log"):
             clear_log()
@@ -315,6 +326,7 @@ def api_start():
             t.start()
             return jsonify({"ok": True, "pid": proc.pid, "python": py})
         except Exception as e:
+            append_log(f"[!] Error gagal memicu subprocess flow.py: {e}\n")
             return jsonify({"error": str(e)}), 500
 
 @app.route("/api/stop", methods=["POST"])
@@ -341,12 +353,12 @@ def api_logs():
     with log_lock:
         lines = list(log_lines)
     
-    # Fallback jika memori kosong tapi file log ada
-    if len(lines) < 5:
-        target_log = LOG_FILE if LOG_FILE.exists() else ROOT_LOG_FILE
-        if target_log.exists():
+    # Baca file log disk jika memory lines belum banyak atau kosong
+    target_logs = [LOG_FILE, ROOT_LOG_FILE]
+    for t_log in target_logs:
+        if t_log.exists():
             try:
-                flines = target_log.read_text(encoding="utf-8", errors="ignore").splitlines()
+                flines = t_log.read_text(encoding="utf-8", errors="ignore").splitlines()
                 if len(flines) > len(lines):
                     lines = flines
             except Exception:
