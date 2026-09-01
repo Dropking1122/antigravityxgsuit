@@ -29,9 +29,18 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---- Konfigurasi ----
-ROUTER_HOST = os.getenv("ROUTER_HOST", "").rstrip("/")
-LOGIN_URL = os.getenv("LOGIN_URL", f"{ROUTER_HOST}/login" if ROUTER_HOST else "")
-TARGET_URL = os.getenv("TARGET_URL", f"{ROUTER_HOST}/dashboard/providers/antigravity" if ROUTER_HOST else "")
+def _clean_url(url: str) -> str:
+    url = (url or "").strip()
+    while "http://http//" in url or "http://http/" in url:
+        url = url.replace("http://http//", "http://").replace("http://http/", "http://")
+    return url
+
+ROUTER_HOST = _clean_url(os.getenv("ROUTER_HOST", "")).rstrip("/")
+LOGIN_URL = _clean_url(os.getenv("LOGIN_URL", f"{ROUTER_HOST}/login" if ROUTER_HOST else ""))
+TARGET_URL = _clean_url(os.getenv("TARGET_URL", f"{ROUTER_HOST}/dashboard/providers/antigravity" if ROUTER_HOST else ""))
+REDIRECT_FROM = _clean_url(os.getenv("REDIRECT_FROM", "http://localhost:20128"))
+REDIRECT_TO = _clean_url(os.getenv("REDIRECT_TO", ROUTER_HOST))
+
 PASSWORD = os.getenv("DASH_PASSWORD", "")
 PROFILE = os.getenv("USER_DATA_DIR", "./browser_profile")
 HEADLESS = os.getenv("HEADLESS", "true").lower() == "true"
@@ -42,10 +51,6 @@ RESET_PROFILE = os.getenv("RESET_PROFILE", "false").lower() == "true"
 RESTART_BROWSER_PER_ACCOUNT = os.getenv("RESTART_BROWSER_PER_ACCOUNT", "false").lower() == "true"
 # Jika true, bersihkan cookie Google tiap akun (agar chooser kosong)
 CLEAR_EACH = os.getenv("CLEAR_EACH", "true").lower() == "true"
-
-# OAuth callback Google mengarah ke localhost, kita rewrite ke IP server
-REDIRECT_FROM = os.getenv("REDIRECT_FROM", "http://localhost:20128")
-REDIRECT_TO = os.getenv("REDIRECT_TO", ROUTER_HOST)
 
 if not LOGIN_URL or not TARGET_URL or not PASSWORD:
     raise ValueError("[!] LOGIN_URL, TARGET_URL/ROUTER_HOST, dan DASH_PASSWORD wajib diisi di .env atau environment variables!")
