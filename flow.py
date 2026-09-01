@@ -98,7 +98,10 @@ def clear_google_sessions(context):
                                  if "google" in c.get("domain", "")})
         for d in google_domains:
             try:
-                context.clear_cookies(filter={"domain": d})
+                try:
+                    context.clear_cookies(domain=d)
+                except TypeError:
+                    context.clear_cookies()
             except Exception as e:
                 print(f"[!] Gagal clear cookie domain {d}: {e}")
         print(f"[*] Cookie Google dihapus ({len(google_domains)} domain).")
